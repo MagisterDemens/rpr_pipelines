@@ -22,16 +22,16 @@ def executeRender(osName, gpuName, Map options) {
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
 							
-							bat """
-								copy "..\\..\\RenderServiceStorage\\${options.sceneName}" "${options.sceneName}"
-							"""
+							//bat """
+							//	copy "..\\..\\RenderServiceStorage\\${options.sceneName}" "${options.sceneName}"
+							//"""
 						} else {
 							bat """ 
 								wget --no-check-certificate "${options.Scene}"
 							"""
-							bat """
-								copy "${options.sceneName}" "..\\..\\RenderServiceStorage"
-							"""
+							//bat """
+							//	copy "${options.sceneName}" "..\\..\\RenderServiceStorage"
+							//"""
 						}
 					} catch(e) {
 						print e
