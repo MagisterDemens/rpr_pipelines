@@ -23,14 +23,14 @@ def executeRender(osName, gpuName, Map options) {
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
 							bat """
-								copy "..\\..\\RenderServiceStorage\\${scene_name}" "${scene_name}"
+								copy "..\\..\\RenderServiceStorage\\"${options.sceneName}" "${options.sceneName}"
 							"""
 						} else {
 							bat """ 
 								wget --no-check-certificate "${options.Scene}"
 							"""
 							bat """
-								copy "${scene_name}" "..\\..\\RenderServiceStorage"
+								copy "${options.sceneName}" "..\\..\\RenderServiceStorage"
 							"""
 						}
 					} catch(e) {
@@ -42,7 +42,7 @@ def executeRender(osName, gpuName, Map options) {
 					try {
 						if ("${scene_name}".endsWith('.zip') || "${scene_name}".endsWith('.7z')) {
 							bat """
-								7z x "${scene_name}"
+								7z x "${options.sceneName}"
 							"""
 						}
 					} catch(e) {
@@ -64,8 +64,8 @@ def executeRender(osName, gpuName, Map options) {
 								print e
 								// if status == failure then copy full path and send to slack
 								bat """
-									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
-									copy "*" "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
+									mkdir "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
+									copy "*" "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
 								"""
 							}
 							break;
@@ -83,8 +83,8 @@ def executeRender(osName, gpuName, Map options) {
 								print e
 								// if status == failure then copy full path and send to slack
 								bat """
-									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
-									copy "*" "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
+									mkdir "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
+									copy "*" "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
 								"""
 							}
 							break;
@@ -102,8 +102,8 @@ def executeRender(osName, gpuName, Map options) {
 								print e
 								// if status == failure then copy full path and send to slack
 								bat """
-									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
-									copy "*" "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
+									mkdir "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
+									copy "*" "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
 								"""
 							}
 							break;
@@ -121,8 +121,8 @@ def executeRender(osName, gpuName, Map options) {
 								print e
 								// if status == failure then copy full path and send to slack
 								bat """
-									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
-									copy "*" "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
+									mkdir "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
+									copy "*" "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
 								"""
 							}
 							break;
@@ -140,8 +140,8 @@ def executeRender(osName, gpuName, Map options) {
 								print e
 								// if status == failure then copy full path and send to slack
 								bat """
-									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
-									copy "*" "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
+									mkdir "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
+									copy "*" "..\\..\\RenderServiceStorage\\failed_${options.sceneName}_${id}_${currentBuild.number}"
 								"""
 							}
 							break;
