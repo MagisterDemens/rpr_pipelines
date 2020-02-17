@@ -165,7 +165,7 @@ def main(String PCs, Map options) {
 	    options['PRJ_PATH']="${PRJ_PATH}"
 	    options['JOB_PATH']="${JOB_PATH}"
 
-	    boolean PRODUCTION = true
+	    boolean PRODUCTION = false
 
 	    if (PRODUCTION) {
 		options['django_url'] = "https://demo.cis.luxoft.com/render/jenkins/"
@@ -173,7 +173,7 @@ def main(String PCs, Map options) {
 		options['cis_tools'] = "RenderServiceScripts"
 		options['jenkins_job'] = "RenderServiceRenderJob"
 	    } else {
-		options['django_url'] = "https://testrender.cis.luxoft.com/render/jenkins/"
+		options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 		options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
 		options['cis_tools'] = "RenderServiceScripts"
 		options['jenkins_job'] = "RenderServiceRenderJob"
