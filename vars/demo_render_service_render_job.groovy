@@ -197,7 +197,7 @@ def main(String PCs, Map options) {
 		options['PRJ_PATH']="${PRJ_PATH}"
 		options['JOB_PATH']="${JOB_PATH}"
 
-		boolean PRODUCTION = true
+		boolean PRODUCTION = false
 
 		if (PRODUCTION) {
 			options['django_url'] = "https://172.26.157.251:84/render/jenkins/"
@@ -207,7 +207,7 @@ def main(String PCs, Map options) {
 		} else {
 			options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 			options['plugin_storage'] = "http://172.26.157.251:84/media/plugins/"
-			options['scripts_branch'] = "develop"
+			options['scripts_branch'] = "master"
 			options['jenkins_job'] = "RenderServiceRenderJob"
 		}
 
