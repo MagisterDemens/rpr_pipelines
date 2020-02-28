@@ -66,7 +66,10 @@ def executeRender(osName, gpuName, Map options) {
                      // Unpacking scene
                      try{
                         python3("unpack.py")
-                     }
+                     }catch(e) {
+						print e
+						fail_reason = "Unpacking scene failed"
+					}
 					
 
 					switch(tool) {
