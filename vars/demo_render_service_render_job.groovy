@@ -45,7 +45,9 @@ def executeRender(osName, gpuName, Map options) {
 					}
 					// download scene, check if it is already downloaded
 					try {
-					    dir("..\\..\\RenderServiceStorage"){}
+					    dir("..\\..\\RenderServiceStorage"){
+					        writeFile file:'test', text:'dir created'
+					    }
 						print(python3("..\\Scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
 						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_name}"
 						if (exists) {
