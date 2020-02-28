@@ -197,7 +197,7 @@ def main(String PCs, Map options) {
 		options['PRJ_PATH']="${PRJ_PATH}"
 		options['JOB_PATH']="${JOB_PATH}"
 
-		boolean PRODUCTION = false
+		boolean PRODUCTION = true
 
 		if (PRODUCTION) {
 			options['django_url'] = "https://172.26.157.251:84/render/jenkins/"
