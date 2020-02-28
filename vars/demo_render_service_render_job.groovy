@@ -23,15 +23,15 @@ def executeRender(osName, gpuName, Map options) {
 					    if (exists){
 					        print("Pull from git to update")
 					        dir("..\\Scripts"){
-					        	bat '''
-					        	git branch --set-upstream-to=origin/master master
+					        	bat """
+					        	git branch --set-upstream-to=origin/${options.scripts_branch} ${options.scripts_branch}
 					        	git pull
-					        	'''
+					        	"""
 					        }
 					    } else {
 					        dir("..\\Scripts"){
 					    	    print("Downloading scripts")
-					    	    git url:"https://github.com/luxteam/render_service_scripts.git"
+					    	    git url:"https://github.com/luxteam/render_service_scripts.git", branch: "${options.scripts_branch}"
 					    	}
 					    }
 					    dir("..\\Scripts"){
@@ -200,14 +200,14 @@ def main(String PCs, Map options) {
 		boolean PRODUCTION = false
 
 		if (PRODUCTION) {
-			options['django_url'] = "https://demo.cis.luxoft.com/render/jenkins/"
-			options['plugin_storage'] = "https://demo.cis.luxoft.com/media/plugins/"
-			options['cis_tools'] = "RenderServiceScripts"
+			options['django_url'] = "https://172.26.157.251:84/render/jenkins/"
+			options['plugin_storage'] = "https://172.26.157.251:84/media/plugins/"
+			options['scripts_branch'] = "master"
 			options['jenkins_job'] = "RenderServiceRenderJob"
 		} else {
 			options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 			options['plugin_storage'] = "http://172.26.157.251:84/media/plugins/"
-			options['cis_tools'] = "RenderServiceScripts"
+			options['scripts_branch'] = "develop"
 			options['jenkins_job'] = "RenderServiceRenderJob"
 		}
 
