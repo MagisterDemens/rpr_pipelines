@@ -23,7 +23,7 @@ def executeRender(osName, gpuName, Map options) {
 					    if (exists){
 					        print("Pull from git to update")
 					        dir("..\\Scripts"){
-					        	git pull
+					        	bat '''git pull'''
 					        }
 					    } else {
 					        dir("..\\Scripts"){
