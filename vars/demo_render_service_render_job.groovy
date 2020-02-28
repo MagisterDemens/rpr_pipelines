@@ -19,14 +19,14 @@ def executeRender(osName, gpuName, Map options) {
 					// Download render service scripts
 					try {
 					    print("Check scripts")
-					    def exists = fileExists "..\\..\\render_service_scripts"
+					    def exists = fileExists "..\\Scripts\\render_service_scripts"
 					    if (exists){
 					        print("Pull from git to update")
-					        dir("..\\..\\render_service_scripts"){
+					        dir("..\\Scripts\\render_service_scripts"){
 					        	git pull
 					        }
 					    } else {
-					        dir("../Scripts"){
+					        dir("..\\Scripts"){
 					    	    print("Downloading scripts")
 					    	    git url:"https://github.com/luxteam/render_service_scripts.git"
 					    	}
@@ -142,7 +142,7 @@ def executeRender(osName, gpuName, Map options) {
 							// copy necessary scripts for render
 							bat """
 								copy "..\\..\\render_service_scripts\\find_scene_core.py" "."
-								copy "..\\..\\render_service_scripts\\launch_core_render.py" "."					
+								copy "..\\..\\render_service_scripts\\launch_core_render.py" "."
 							"""
 							// Launch render
 							try {
