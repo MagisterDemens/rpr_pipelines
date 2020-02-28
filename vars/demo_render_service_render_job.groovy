@@ -63,6 +63,10 @@ def executeRender(osName, gpuName, Map options) {
 						fail_reason = "Downloading scene failed"
 					}
 
+                     // Unpacking scene
+                     try{
+                        python3("unpack.py")
+                     }
 					
 
 					switch(tool) {
