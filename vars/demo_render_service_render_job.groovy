@@ -23,7 +23,10 @@ def executeRender(osName, gpuName, Map options) {
 					    if (exists){
 					        print("Pull from git to update")
 					        dir("..\\Scripts"){
-					        	bat '''git pull'''
+					        	bat '''
+					        	git branch --set-upstream-to=origin/<branch> master
+					        	git pull
+					        	'''
 					        }
 					    } else {
 					        dir("..\\Scripts"){
