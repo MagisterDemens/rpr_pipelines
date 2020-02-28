@@ -23,9 +23,9 @@ def executeRender(osName, gpuName, Map options) {
 					    	print("Downloading scripts")
 					    	checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
 					    }
-					    dir("..\\Scripts"){
+					    dir("..\\Scripts\\install"){
 					        	bat '''
-					        	pip3 install -r requirements.txt
+                                    install_pylibs.bat
 					        	'''
 					        }
 					} catch(e) {
@@ -192,12 +192,10 @@ def main(String PCs, Map options) {
 			options['django_url'] = "https://172.26.157.251:84/render/jenkins/"
 			options['plugin_storage'] = "https://172.26.157.251:84/media/plugins/"
 			options['scripts_branch'] = "master"
-			options['jenkins_job'] = "RenderServiceRenderJob"
 		} else {
 			options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 			options['plugin_storage'] = "http://172.26.157.251:84/media/plugins/"
-			options['scripts_branch'] = "master"
-			options['jenkins_job'] = "RenderServiceRenderJob"
+			options['scripts_branch'] = "egurin/unpack"
 		}
 
 		def testTasks = [:]
