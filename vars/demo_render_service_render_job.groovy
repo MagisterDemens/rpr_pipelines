@@ -19,10 +19,10 @@ def executeRender(osName, gpuName, Map options) {
 					// Download render service scripts
 					try {
 					    print("Check scripts")
-					    def exists = fileExists "..\\Scripts\\render_service_scripts"
+					    def exists = fileExists "..\\Scripts"
 					    if (exists){
 					        print("Pull from git to update")
-					        dir("..\\Scripts\\render_service_scripts"){
+					        dir("..\\Scripts"){
 					        	git pull
 					        }
 					    } else {
@@ -37,7 +37,7 @@ def executeRender(osName, gpuName, Map options) {
 					}
 					// download scene, check if it is already downloaded
 					try {
-						print(python3("..\\..\\render_service_scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
+						print(python3("..\\Scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
 						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_name}"
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
@@ -65,8 +65,8 @@ def executeRender(osName, gpuName, Map options) {
 						case 'Blender':
 							// copy necessary scripts for render
 							bat """
-								copy "..\\..\\render_service_scripts\\blender_render.py" "."
-								copy "..\\..\\render_service_scripts\\launch_blender.py" "."
+								copy "..\\Scripts\\blender_render.py" "."
+								copy "..\\Scripts\\launch_blender.py" "."
 							"""
 							// Launch render
 							try {
@@ -84,8 +84,8 @@ def executeRender(osName, gpuName, Map options) {
 						case 'Max':
 							// copy necessary scripts for render
 							bat """
-								copy "..\\..\\render_service_scripts\\max_render.ms" "."
-								copy "..\\..\\render_service_scripts\\launch_max.py" "."
+								copy "..\\Scripts\\max_render.ms" "."
+								copy "..\\Scripts\\launch_max.py" "."
 							"""
 							// Launch render
 							try {
@@ -103,8 +103,8 @@ def executeRender(osName, gpuName, Map options) {
 						case 'Maya':
 							// copy necessary scripts for render
 							bat """
-								copy "..\\..\\render_service_scripts\\maya_render.py" "."
-								copy "..\\..\\render_service_scripts\\launch_maya.py" "."
+								copy "..\\Scripts\\maya_render.py" "."
+								copy "..\\Scripts\\launch_maya.py" "."
 							"""
 							// Launch render
 							try {
@@ -122,8 +122,8 @@ def executeRender(osName, gpuName, Map options) {
 						case 'Maya (Redshift)':
 							// copy necessary scripts for render
 							bat """
-								copy "..\\..\\render_service_scripts\\redshift_render.py" "."
-								copy "..\\..\\render_service_scripts\\launch_maya_redshift.py" "."
+								copy "..\\Scripts\\redshift_render.py" "."
+								copy "..\\Scripts\\launch_maya_redshift.py" "."
 							"""
 							// Launch render
 							try {
@@ -141,8 +141,8 @@ def executeRender(osName, gpuName, Map options) {
 						case 'Core':
 							// copy necessary scripts for render
 							bat """
-								copy "..\\..\\render_service_scripts\\find_scene_core.py" "."
-								copy "..\\..\\render_service_scripts\\launch_core_render.py" "."
+								copy "..\\Scripts\\find_scene_core.py" "."
+								copy "..\\Scripts\\launch_core_render.py" "."
 							"""
 							// Launch render
 							try {
@@ -161,7 +161,7 @@ def executeRender(osName, gpuName, Map options) {
 				} catch(e) {
 					currentBuild.result = 'FAILURE'
 					print e
-					print(python3("..\\..\\render_service_scripts\\send_render_results.py --django_ip \"${options.django_url}/\" --build_number ${currentBuild.number} --status ${currentBuild.result} --fail_reason \"${fail_reason}\" --id ${id}"))
+					print(python3("..\\Scripts\\send_render_results.py --django_ip \"${options.django_url}/\" --build_number ${currentBuild.number} --status ${currentBuild.result} --fail_reason \"${fail_reason}\" --id ${id}"))
 				}
 				break;
 		}
