@@ -27,9 +27,12 @@ def executeRender(osName, gpuName, Map options) {
 					        }
 					    } else {
 					    	dir("..\\.."){
-					    		git url: "https://github.com/luxteam/render_service_scripts.git"
+					    		git branch:"master", url: "https://github.com/luxteam/render_service_scripts.git"
 					    	}
 					    }
+					} catch(e) {
+						print e
+						fail_reason = "Downloading scripts failed"
 					}
 					// download scene, check if it is already downloaded
 					try {
@@ -52,7 +55,7 @@ def executeRender(osName, gpuName, Map options) {
 						}
 					} catch(e) {
 						print e
-						fail_reason = "Downloading failed"
+						fail_reason = "Downloading scene failed"
 					}
 
 					
