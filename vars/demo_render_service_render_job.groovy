@@ -34,6 +34,11 @@ def executeRender(osName, gpuName, Map options) {
 					    	    git url:"https://github.com/luxteam/render_service_scripts.git"
 					    	}
 					    }
+					    dir("..\\Scripts"){
+					        	bat '''
+					        	pip3 install -r requirements.txt
+					        	'''
+					        }
 					} catch(e) {
 						print e
 						fail_reason = "Downloading scripts failed"
