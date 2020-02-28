@@ -19,9 +19,20 @@ def executeRender(osName, gpuName, Map options) {
 					// Download render service scripts
 					try {
 					    print("Check scripts")
-					    dir("..\\Scripts"){
-					    	print("Downloading scripts")
-					    	checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
+					    def exists = fileExists "..\\Scripts"
+					    if (exists){
+					        print("Pull from git to update")
+					        dir("..\\Scripts"){
+					        	bat """
+					        	git branch --set-upstream-to=origin/${options.scripts_branch} ${options.scripts_branch}
+					        	git pull
+					        	"""
+					        }
+					    } else {
+					        dir("..\\Scripts"){
+					    	    print("Downloading scripts")
+					    	    git url:"https://github.com/luxteam/render_service_scripts.git", branch: "${options.scripts_branch}"
+					    	}
 					    }
 					    dir("..\\Scripts"){
 					        	bat '''
@@ -46,7 +57,7 @@ def executeRender(osName, gpuName, Map options) {
 							"""
 						} else {
 							withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'renderServiceCredentials', usernameVariable: 'DJANGO_USER', passwordVariable: 'DJANGO_PASSWORD']]) {
-								bat """
+								bat """ 
 									curl -o "${scene_name}" -u %DJANGO_USER%:%DJANGO_PASSWORD% "${options.Scene}"
 								"""
 							}
@@ -69,7 +80,7 @@ def executeRender(osName, gpuName, Map options) {
 						print e
 						fail_reason = "Unpacking scene failed"
 					}
-
+					
 
 					switch(tool) {
 						case 'Blender':
@@ -196,7 +207,7 @@ def main(String PCs, Map options) {
 		} else {
 			options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 			options['plugin_storage'] = "http://172.26.157.251:84/media/plugins/"
-			options['scripts_branch'] = "develop"
+			options['scripts_branch'] = "master"
 			options['jenkins_job'] = "RenderServiceRenderJob"
 		}
 
