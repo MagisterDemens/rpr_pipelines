@@ -24,7 +24,7 @@ def executeRender(osName, gpuName, Map options) {
 					        print("Pull from git to update")
 					        dir("..\\Scripts"){
 					        	bat '''
-					        	git branch --set-upstream-to=origin/<branch> master
+					        	git branch --set-upstream-to=origin/master master
 					        	git pull
 					        	'''
 					        }
