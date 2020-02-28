@@ -19,20 +19,9 @@ def executeRender(osName, gpuName, Map options) {
 					// Download render service scripts
 					try {
 					    print("Check scripts")
-					    def exists = fileExists "..\\Scripts"
-					    if (exists){
-					        print("Pull from git to update")
-					        dir("..\\Scripts"){
-					        	bat """
-					        	git branch --set-upstream-to=origin/${options.scripts_branch} ${options.scripts_branch}
-					        	git pull
-					        	"""
-					        }
-					    } else {
-					        dir("..\\Scripts"){
-					    	    print("Downloading scripts")
-					    	    git url:"https://github.com/luxteam/render_service_scripts.git", branch: "${options.scripts_branch}"
-					    	}
+					    dir("..\\Scripts"){
+					    	print("Downloading scripts")
+					    	checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
 					    }
 					    dir("..\\Scripts"){
 					        	bat '''
