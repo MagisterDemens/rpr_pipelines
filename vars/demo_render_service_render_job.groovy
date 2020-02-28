@@ -26,10 +26,8 @@ def executeRender(osName, gpuName, Map options) {
 					        	git pull
 					        }
 					    } else {
-					    	dir("..\\..\\"){
-					    		print("Downloading scripts")
-					    		git url:"https://github.com/luxteam/render_service_scripts.git"
-					    	}
+					    	print("Downloading scripts")
+					    	git url:"https://github.com/luxteam/render_service_scripts.git"
 					    }
 					} catch(e) {
 						print e
