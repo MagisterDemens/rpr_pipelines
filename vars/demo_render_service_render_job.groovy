@@ -64,9 +64,12 @@ def executeRender(osName, gpuName, Map options) {
 					}
 
                      // Unpacking scene
-                     try{
+                    try{
+                        bat """
+							copy "..\\Scripts\\unpack.py" "."
+						"""
                         python3("unpack.py")
-                     }catch(e) {
+                    } catch(e) {
 						print e
 						fail_reason = "Unpacking scene failed"
 					}
