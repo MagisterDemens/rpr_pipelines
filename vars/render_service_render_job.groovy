@@ -59,17 +59,10 @@ def executeRender(osName, gpuName, Map options) {
 						fail_reason = "Downloading scene failed"
 					}
 
-                     // Unpacking scene
-                    try{
-                        bat """
-							copy "..\\Scripts\\unpack.py" "."
-						"""
-                        python3("unpack.py")
-                    } catch(e) {
-						print e
-						fail_reason = "Unpacking scene failed"
-					}
-					
+                     // copy unpacking script
+                     bat """
+						copy "..\\Scripts\\unpack.py" "."
+			        """
 
 					switch(tool) {
 						case 'Blender':
