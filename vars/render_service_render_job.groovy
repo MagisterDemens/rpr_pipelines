@@ -22,9 +22,11 @@ def executeRender(osName, gpuName, Map options) {
 					    print("Downloading scripts and install requirements")
 					    dir("..\\RenderServiceScripts"){
 					    	checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
-					        bat '''
-                                .\\install\\install_pylibs.bat
-					        '''
+					    	dir(".\\install"){
+					            bat '''
+                                    install_pylibs.bat
+					            '''
+					        }
 					    }
 					} catch(e) {
 						print e
