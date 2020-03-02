@@ -1,4 +1,4 @@
-`def executeRender(osName, gpuName, Map options) {
+def executeRender(osName, gpuName, Map options) {
     currentBuild.result = 'SUCCESS'
 
     String tool = options['Tool'].split(':')[0].trim()
