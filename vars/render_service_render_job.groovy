@@ -50,8 +50,8 @@ def executeRender(osName, gpuName, Map options) {
 								"""
 							}
 							bat """
+							    if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
 								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}"
-								if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
 								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 							"""
 						}
