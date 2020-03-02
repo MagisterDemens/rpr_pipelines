@@ -75,10 +75,10 @@ def installPlugins(String osName, Map options)
         // install new plugin
         dir('temp/install_plugin')
         {
-            receiveFiles("/bin_storage/RadeonProRenderMaya_2.7.349.msi", "/mnt/c/TestResources/")
+            receiveFiles("/bin_storage/RadeonProRenderMaya_2.8.44.msi", "/mnt/c/TestResources/")
 
             bat """
-            msiexec /i "C:\\TestResources\\RadeonProRenderMaya_2.7.349.msi" /quiet /qn PIDKEY=${env.RPR_PLUGIN_KEY} /L+ie ../../${options.stageName}.install.log /norestart
+            msiexec /i "C:\\TestResources\\RadeonProRenderMaya_2.8.44.msi" /quiet /qn PIDKEY=${env.RPR_PLUGIN_KEY} /L+ie ../../${options.stageName}.install.log /norestart
             """
         }
 
@@ -128,12 +128,10 @@ def executeTests(String osName, String asicName, Map options)
         checkoutGit(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rs2rpr.git')
         dir('jobs/Scripts')
         {
-            bat "del convertRS2RPR.mel"
-            unstash "convertionScript"
             if(fileExists("convertRS2RPR.py")){
                 bat "del convertRS2RPR.py"
             }
-            unstash "convertionScriptPython"
+            unstash "convertionScript"
         }
 
         // update assets
@@ -279,8 +277,7 @@ def executePreBuild(Map options)
     {
         checkOutBranchOrScm(options['projectBranch'], 'git@github.com:luxteam/RS2RPRConvertTool.git')
 
-        stash includes: "convertRS2RPR.mel", name: "convertionScript"
-        stash includes: "convertRS2RPR.py", name: "convertionScriptPython"
+        stash includes: "convertRS2RPR.py", name: "convertionScript"
 
         AUTHOR_NAME = bat (
                 script: "git show -s --format=%%an HEAD ",

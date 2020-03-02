@@ -75,10 +75,10 @@ def installPlugins(String osName, Map options)
             // install new plugin
             dir('temp/install_plugin')
             {
-                receiveFiles("/bin_storage/RadeonProRenderMaya_2.5.261.msi", "/mnt/c/TestResources/")
+                receiveFiles("/bin_storage/RadeonProRenderMaya_2.8.44.msi", "/mnt/c/TestResources/")
 
                 bat """
-                msiexec /i "C:\\TestResources\\RadeonProRenderMaya_2.5.261.msi" /quiet /qn PIDKEY=${env.RPR_PLUGIN_KEY} /L+ie ../../${options.stageName}.install.log /norestart
+                msiexec /i "C:\\TestResources\\RadeonProRenderMaya_2.8.44.msi" /quiet /qn PIDKEY=${env.RPR_PLUGIN_KEY} /L+ie ../../${options.stageName}.install.log /norestart
                 """
             }
 
@@ -128,7 +128,9 @@ def executeTests(String osName, String asicName, Map options)
         checkoutGit(options['testsBranch'], 'git@github.com:luxteam/jobs_test_ai2rpr.git')
         dir('jobs/Scripts')
         {
-            bat "del convertAI2RPR.py"
+            if(fileExists("convertAI2RPR.py")){
+                bat "del convertAI2RPR.py"
+            }
             unstash "convertionScript"
         }
         // update assets
@@ -264,8 +266,6 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    //properties([])
-
     dir('Arnold2RPRConvertTool')
     {
         checkOutBranchOrScm(options['projectBranch'], 'git@github.com:luxteam/Arnold2RPRConvertTool-Maya.git')

@@ -3,7 +3,8 @@ def executeConvert(osName, gpuName, Map options) {
 	
 	String tool = options['Tool'].split(':')[0].trim()
 	String version = options['Tool'].split(':')[1].trim()
-	String scene_name = options['Scene'].split('/')[-1].trim()
+	String scene_name = options['sceneName']
+   	String scene_user = options['sceneUser']
 	String fail_reason = "Unknown"
 	
 	timeout(time: 65, unit: 'MINUTES') {
@@ -16,22 +17,25 @@ def executeConvert(osName, gpuName, Map options) {
 						del /q *
 						for /d %%x in (*) do @rd /s /q "%%x"
 					''' 
-
 					// download scene, check if it is already downloaded
 					try {
 						print(python3("${CIS_TOOLS}\\${options.cis_tools}\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
-						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_name}"
+						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
 							bat """
-								copy "..\\..\\RenderServiceStorage\\${scene_name}" "${scene_name}"
+								copy "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}" "${scene_name}"
 							"""
 						} else {
-							bat """ 
-								wget --no-check-certificate "${options.Scene}"
-							"""
+							withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'renderServiceCredentials', usernameVariable: 'DJANGO_USER', passwordVariable: 'DJANGO_PASSWORD']]) {
+								bat """ 
+									curl -o "${scene_name}" -u %DJANGO_USER%:%DJANGO_PASSWORD% "${options.Scene}"
+								"""
+							}
 							bat """
-								copy "${scene_name}" "..\\..\\RenderServiceStorage"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}"
+								if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 							"""
 						}
 					} catch(e) {
@@ -159,7 +163,8 @@ def call(String Tool = '',
 	String Scene = '',  
 	String PCs = '',
 	String id = '',
-	String sceneName = ''
+	String sceneName = '',
+	String sceneUser = ''
 	) {
 	String PRJ_ROOT='RenderServiceConvertJob'
 	String PRJ_NAME='RenderServiceConvertJob'  
@@ -170,6 +175,7 @@ def call(String Tool = '',
 		Tool:Tool,
 		Scene:Scene,
 		id:id,
-		sceneName:sceneName
+		sceneName:sceneName,
+		sceneUser:sceneUser
 		])
 	}

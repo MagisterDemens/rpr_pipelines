@@ -1,10 +1,10 @@
- def executeGenTestRefCommand(String osName, Map options)
+def executeGenTestRefCommand(String osName, Map options)
 {
 }
 
 def executeTestCommand(String osName, Map options)
 {
-    dir('build-direct/Release') {
+    dir('build/bin') {
         switch(osName) {
             case 'Windows':
                 bat """
@@ -129,7 +129,6 @@ def executeBuild(String osName, Map options)
     try {
         checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
         outputEnvironmentInfo(osName, "${STAGE_NAME}.Release")
-        // outputEnvironmentInfo(osName, "${STAGE_NAME}.Debug")
 
         if (env.CHANGE_ID) {
             pullRequest.createStatus("pending", context, "Checkout has been finished. Trying to build...", "${env.JOB_URL}")
@@ -146,7 +145,7 @@ def executeBuild(String osName, Map options)
             executeBuildLinux(options);
         }
 
-        // stash includes: 'build/**/*', name: "app${osName}"
+        stash includes: 'build/bin/*', name: "app${osName}"
     }
     catch (e) {
         println(e.getMessage())
@@ -162,8 +161,7 @@ def executeBuild(String osName, Map options)
         }
 
         archiveArtifacts "${STAGE_NAME}.*.log"
-        // zip archive: true, dir: 'build-direct/Release', glob: 'RadeonML-DirectML.*, *.exe', zipFile: "${osName}_Release.zip"
-        // zip archive: true, dir: 'build-direct-debug/Debug', glob: 'RadeonML-DirectML-d.*, *.exe', zipFile: "${osName}_Debug.zip"
+        zip archive: true, dir: 'build/bin', zipFile: "${osName}_Release.zip"
     }
 }
 
@@ -179,7 +177,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
 }
 
 def call(String projectBranch = "",
-         String platforms = 'OSX',
+         String platforms = 'OSX:AMD_RXVEGA',
          String PRJ_ROOT='rpr-ml',
          String PRJ_NAME='MPS',
          String projectRepo='https://github.com/Radeon-Pro/RadeonML.git',

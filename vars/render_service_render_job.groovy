@@ -1,11 +1,12 @@
-def executeRender(osName, gpuName, Map options) {
-	currentBuild.result = 'SUCCESS'
+`def executeRender(osName, gpuName, Map options) {
+    currentBuild.result = 'SUCCESS'
 
-	String tool = options['Tool'].split(':')[0].trim()
-	String version = options['Tool'].split(':')[1].trim()
-	String scene_name = options['sceneName']
+    String tool = options['Tool'].split(':')[0].trim()
+    String version = options['Tool'].split(':')[1].trim()
+   	String scene_name = options['sceneName']
+   	String scene_user = options['sceneUser']
 	String fail_reason = "Unknown"
-
+    
 	timeout(time: 65, unit: 'MINUTES') {
 		switch(osName) {
 			case 'Windows':
@@ -38,20 +39,22 @@ def executeRender(osName, gpuName, Map options) {
 					        writeFile file:'test', text:'dir created'
 					    }
 						print(python3("..\\Scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
-						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_name}"
+						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
 							bat """
-								copy "..\\..\\RenderServiceStorage\\${scene_name}" "${scene_name}"
+								copy "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}" "${scene_name}"
 							"""
 						} else {
 							withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'renderServiceCredentials', usernameVariable: 'DJANGO_USER', passwordVariable: 'DJANGO_PASSWORD']]) {
-								bat """ 
+								bat """
 									curl -o "${scene_name}" -u %DJANGO_USER%:%DJANGO_PASSWORD% "${options.Scene}"
 								"""
 							}
 							bat """
-								copy "${scene_name}" "..\\..\\RenderServiceStorage"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}"
+								if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 							"""
 						}
 					} catch(e) {
@@ -104,7 +107,7 @@ def executeRender(osName, gpuName, Map options) {
 							break;
 
 						case 'Maya':
-							// copy necessary scripts for render
+							// copy necessary scripts for render	
 							bat """
 								copy "..\\Scripts\\maya_render.py" "."
 								copy "..\\Scripts\\launch_maya.py" "."
@@ -123,7 +126,7 @@ def executeRender(osName, gpuName, Map options) {
 							break;
 
 						case 'Maya (Redshift)':
-							// copy necessary scripts for render
+							// copy necessary scripts for render	
 							bat """
 								copy "..\\Scripts\\redshift_render.py" "."
 								copy "..\\Scripts\\launch_maya_redshift.py" "."
@@ -142,7 +145,7 @@ def executeRender(osName, gpuName, Map options) {
 							break;
 
 						case 'Core':
-							// copy necessary scripts for render
+							// copy necessary scripts for render	
 							bat """
 								copy "..\\Scripts\\find_scene_core.py" "."
 								copy "..\\Scripts\\launch_core_render.py" "."
@@ -160,7 +163,7 @@ def executeRender(osName, gpuName, Map options) {
 							}
 							break;
 
-					}
+						}   
 				} catch(e) {
 					currentBuild.result = 'FAILURE'
 					print e
@@ -168,42 +171,44 @@ def executeRender(osName, gpuName, Map options) {
 				}
 				break;
 		}
-	}
+    }
 }
 
 def main(String PCs, Map options) {
 
 	timestamps {
-		String PRJ_PATH="${options.PRJ_ROOT}/${options.PRJ_NAME}"
-		String JOB_PATH="${PRJ_PATH}/${JOB_NAME}/Build-${BUILD_ID}".replace('%2F', '_')
-		options['PRJ_PATH']="${PRJ_PATH}"
-		options['JOB_PATH']="${JOB_PATH}"
+	    String PRJ_PATH="${options.PRJ_ROOT}/${options.PRJ_NAME}"
+	    String JOB_PATH="${PRJ_PATH}/${JOB_NAME}/Build-${BUILD_ID}".replace('%2F', '_')
+	    options['PRJ_PATH']="${PRJ_PATH}"
+	    options['JOB_PATH']="${JOB_PATH}"
 
-		boolean PRODUCTION = true
+	    boolean PRODUCTION = true
 
-		if (PRODUCTION) {
-			options['django_url'] = "https://render.cis.luxoft.com/render/jenkins/"
-			options['plugin_storage'] = "https://render.cis.luxoft.com/media/plugins/"
-			options['scripts_branch'] = "master"
-		} else {
-			options['django_url'] = "https://testrender.cis.luxoft.com/render/jenkins/"
-			options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
-			options['scripts_branch'] = "develop"
-		}
+	    if (PRODUCTION) {
+		options['django_url'] = "https://render.cis.luxoft.com/render/jenkins/"
+		options['plugin_storage'] = "https://render.cis.luxoft.com/media/plugins/"
+		options['cis_tools'] = "RenderServiceScriptsDebug"
+		options['jenkins_job'] = "RenderServiceRenderJob"
+	    } else {
+		options['django_url'] = "https://testrender.cis.luxoft.com/render/jenkins/"
+		options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
+		options['cis_tools'] = "RenderServiceScripts"
+		options['jenkins_job'] = "RenderServiceRenderJob"
+	    }
 
 		def testTasks = [:]
 		List tokens = PCs.tokenize(':')
 		String osName = tokens.get(0)
 		String deviceName = tokens.get(1)
-
+		
 		String renderDevice = ""
-		if (deviceName == "ANY") {
+	    if (deviceName == "ANY") {
 			String tool = options['Tool'].split(':')[0].trim()
 			renderDevice = tool
-		} else {
+	    } else {
 			renderDevice = "gpu${deviceName}"
-		}
-
+	    }
+		
 		try {
 			echo "Scheduling Render ${osName}:${deviceName}"
 			testTasks["Render-${osName}-${deviceName}"] = {
@@ -219,47 +224,49 @@ def main(String PCs, Map options) {
 			}
 
 			parallel testTasks
-
-		} catch(e) {
+		    
+	    } catch(e) {
 			println(e.toString());
 			println(e.getMessage());
 			println(e.getStackTrace());
 			currentBuild.result = "FAILED"
 			print e
-		}
-	}
-
+	    } 
+	}    
+    
 }
-
+    
 def call(String PCs = '',
-		 String id = '',
-		 String Tool = '',
-		 String Scene = '',
-		 String sceneName = '',
-		 String Min_samples = '',
-		 String Max_samples = '',
-		 String Noise_threshold = '',
-		 String startFrame = '',
-		 String endFrame = '',
-		 String Width = '',
-		 String Height = ''
-) {
+    String id = '',
+    String Tool = '',
+    String Scene = '',  
+    String sceneName = '',
+    String sceneUser = '',
+    String Min_samples = '',
+    String Max_samples = '',
+    String Noise_threshold = '',
+    String startFrame = '',
+    String endFrame = '',
+    String Width = '',
+    String Height = ''
+    ) {
 	String PRJ_ROOT='RenderServiceRenderJob'
-	String PRJ_NAME='RenderServiceRenderJob'
+	String PRJ_NAME='RenderServiceRenderJob'  
 	main(PCs,[
-			enableNotifications:false,
-			PRJ_NAME:PRJ_NAME,
-			PRJ_ROOT:PRJ_ROOT,
-			id:id,
-			Tool:Tool,
-			Scene:Scene,
-			sceneName:sceneName,
-			Min_Samples:Min_Samples,
-			Max_Samples:Max_Samples,
-			Noise_threshold:Noise_threshold,
-			startFrame:startFrame,
-			endFrame:endFrame,
-			Width:Width,
-			Height:Height
-	])
-}
+	    enableNotifications:false,
+	    PRJ_NAME:PRJ_NAME,
+	    PRJ_ROOT:PRJ_ROOT,
+	    id:id,
+	    Tool:Tool,
+	    Scene:Scene,
+	    sceneName:sceneName,
+	    sceneUser:sceneUser,
+	    Min_Samples:Min_Samples,
+	    Max_Samples:Max_Samples,
+	    Noise_threshold:Noise_threshold,
+	    startFrame:startFrame,
+	    endFrame:endFrame,
+	    Width:Width,
+	    Height:Height
+	    ])
+    }

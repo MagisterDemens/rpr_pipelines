@@ -89,7 +89,7 @@ def installPlugin(String osName, Map options)
             }
 
             bat """
-            msiexec /i "${options.pluginWinSha}.msi" /quiet /qn BLENDER_281_INSTALL_FOLDER="C:\\Program Files\\Blender Foundation\\Blender 2.81" /L+ie ../../${options.stageName}.install.log /norestart
+            msiexec /i "${options.pluginWinSha}.msi" /quiet /qn BLENDER_282_INSTALL_FOLDER="C:\\Program Files\\Blender Foundation\\Blender 2.82" /L+ie ../../${options.stageName}.install.log /norestart
             """
 
             // duct tape for plugin registration
@@ -107,7 +107,7 @@ def installPlugin(String osName, Map options)
                 echo bpy.ops.preferences.addon_enable(module="rprblender") >> registerRPRinBlender.py
                 echo bpy.ops.wm.save_userpref() >> registerRPRinBlender.py
 
-                "C:\\Program Files\\Blender Foundation\\Blender 2.81\\blender.exe" -b -P registerRPRinBlender.py >>../../${options.stageName}.install.log 2>&1
+                "C:\\Program Files\\Blender Foundation\\Blender 2.82\\blender.exe" -b -P registerRPRinBlender.py >>../../${options.stageName}.install.log 2>&1
                 """
             }
             catch(e)
@@ -187,7 +187,7 @@ def installPlugin(String osName, Map options)
             try
             {
                 sh"""
-                /home/user/.local/share/rprblender/uninstall.py /home/user/Desktop/Blender2.81/ >>../../${options.stageName}.uninstall.log 2>&1
+                /home/user/.local/share/rprblender/uninstall.py /home/user/Desktop/Blender2.82/ >>../../${options.stageName}.uninstall.log 2>&1
                 """
             }
 
@@ -224,7 +224,7 @@ def installPlugin(String osName, Map options)
             printf "y\nq\n\ny\ny\n" > input.txt
             exec 0<input.txt
             exec &>${env.WORKSPACE}/${options.stageName}.install.log
-            ${CIS_TOOLS}/../PluginsBinaries/${options.pluginUbuntuSha}.run --nox11 --noprogress ~/Desktop/Blender2.81 >> ../../${options.stageName}.install.log 2>&1
+            ${CIS_TOOLS}/../PluginsBinaries/${options.pluginUbuntuSha}.run --nox11 --noprogress ~/Desktop/Blender2.82 >> ../../${options.stageName}.install.log 2>&1
             """
 
             // install matlib
@@ -244,7 +244,7 @@ def buildRenderCache(String osName)
     {
         case 'Windows':
             // FIX: relative path to blender.exe
-            bat '"C:\\Program Files\\Blender Foundation\\Blender 2.81\\blender.exe" -b -E RPR -f 0'
+            bat '"C:\\Program Files\\Blender Foundation\\Blender 2.82\\blender.exe" -b -E RPR -f 0'
             break;
         case 'OSX':
             sh "blender -b -E RPR -f 0"
@@ -716,6 +716,7 @@ def executePreBuild(Map options)
 
     
     def tests = []
+    options.groupsRBS = []
     if(options.testsPackage != "none")
     {
         dir('jobs_test_blender')
@@ -724,16 +725,23 @@ def executePreBuild(Map options)
             // json means custom test suite. Split doesn't supported
             if(options.testsPackage.endsWith('.json'))
             {
-                options.testsList = ['']
+                def testsByJson = readJSON file: "jobs/${options.testsPackage}"
+                testsByJson.each() {
+                    options.groupsRBS << "${it.key}"
+                }
+                options.splitTestsExecution = false
             }
-            // options.splitTestsExecution = false
-            String tempTests = readFile("jobs/${options.testsPackage}")
-            tempTests.split("\n").each {
-                // TODO: fix: duck tape - error with line ending
-                tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+            else {
+                // options.splitTestsExecution = false
+                String tempTests = readFile("jobs/${options.testsPackage}")
+                tempTests.split("\n").each {
+                    // TODO: fix: duck tape - error with line ending
+                    tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+                }
+                options.tests = tests
+                options.testsPackage = "none"
+                options.groupsRBS = tests
             }
-            options.tests = tests
-            options.testsPackage = "none"
         }
     }
     else {
@@ -742,10 +750,8 @@ def executePreBuild(Map options)
             tests << "${it}"
         }
         options.tests = tests
+        options.groupsRBS = tests
     }
-
-    // suites to RBS
-    options.groupsRBS = tests
 
     if(options.splitTestsExecution) {
         options.testsList = options.tests
@@ -802,7 +808,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 {
                     dir("jobs_launcher") {
                         bat """
-                        build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.8')}" ${options.commitSHA} ${branchName} \"${escapeCharsByUnicode(options.commitMessage)}\"
+                        build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.82')}" ${options.commitSHA} ${branchName} \"${escapeCharsByUnicode(options.commitMessage)}\"
                         """
                     }
                 }
@@ -905,6 +911,11 @@ def call(String projectBranch = "",
     String iter = '50',
     String theshold = '0.05')
 {
+    resX = (resX == 'Default') ? '0' : resX
+    resY = (resY == 'Default') ? '0' : resY
+    SPU = (SPU == 'Default') ? '25' : SPU
+    iter = (iter == 'Default') ? '50' : iter
+    theshold = (theshold == 'Default') ? '0.05' : theshold
     try
     {
         String PRJ_NAME="RadeonProRenderBlender2.8Plugin"

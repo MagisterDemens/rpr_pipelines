@@ -449,6 +449,8 @@ def executePreBuild(Map options)
     }
 
     def tests = []
+    options.groupsRBS = []
+
     if(options.testsPackage != "none")
     {
         dir('jobs_test_max')
@@ -457,15 +459,22 @@ def executePreBuild(Map options)
             // json means custom test suite. Split doesn't supported
             if(options.testsPackage.endsWith('.json'))
             {
-                options.testsList = ['']
+                def testsByJson = readJSON file: "jobs/${options.testsPackage}"
+                testsByJson.each() {
+                    options.groupsRBS << "${it.key}"
+                }
+                options.splitTestsExecution = false
             }
-            String tempTests = readFile("jobs/${options.testsPackage}")
-            tempTests.split("\n").each {
-                // TODO: fix: duck tape - error with line ending
-                tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+            else {
+                String tempTests = readFile("jobs/${options.testsPackage}")
+                tempTests.split("\n").each {
+                    // TODO: fix: duck tape - error with line ending
+                    tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+                }
+                options.tests = tests
+                options.testsPackage = "none"
+                options.groupsRBS = tests
             }
-            options.tests = tests
-            options.testsPackage = "none"
         }
     }
     else
@@ -475,10 +484,10 @@ def executePreBuild(Map options)
             tests << "${it}"
         }
         options.tests = tests
+        options.groupsRBS = tests
     }
-    
-    // suites to RBS
-    options.groupsRBS = tests
+
+    println(options.groupsRBS)
 
     if(options.splitTestsExecution) {
         options.testsList = options.tests
@@ -624,14 +633,19 @@ def call(String projectBranch = "",
         String tests = "",
         String toolVersion = "2020",
         Boolean forceBuild = false,
-        Boolean splitTestsExectuion = false,
+        Boolean splitTestsExecution = false,
         Boolean sendToRBS = true,
         String resX = '0',
         String resY = '0',
         String SPU = '25',
         String iter = '50',
-        String theshold = '0.05') {
-
+        String theshold = '0.05') 
+{
+    resX = (resX == 'Default') ? '0' : resX
+    resY = (resY == 'Default') ? '0' : resY
+    SPU = (SPU == 'Default') ? '25' : SPU
+    iter = (iter == 'Default') ? '50' : iter
+    theshold = (theshold == 'Default') ? '0.05' : theshold
     try
     {
 
@@ -673,7 +687,7 @@ def call(String projectBranch = "",
                                 executeTests:false,
                                 forceBuild:forceBuild,
                                 reportName:'Test_20Report',
-                                splitTestsExectuion:splitTestsExectuion,
+                                splitTestsExecution:splitTestsExecution,
                                 sendToRBS: sendToRBS,
                                 gpusCount:gpusCount,
                                 TEST_TIMEOUT:720,
