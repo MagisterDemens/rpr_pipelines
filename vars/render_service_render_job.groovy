@@ -177,15 +177,13 @@ def main(String PCs, Map options) {
 	    boolean PRODUCTION = true
 
 	    if (PRODUCTION) {
-		options['django_url'] = "https://render.cis.luxoft.com/render/jenkins/"
+		options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 		options['plugin_storage'] = "https://render.cis.luxoft.com/media/plugins/"
-		options['cis_tools'] = "RenderServiceScriptsDebug"
-		options['jenkins_job'] = "RenderServiceRenderJob"
+		options['scripts_branch'] = "egurin/render_service"
 	    } else {
 		options['django_url'] = "https://testrender.cis.luxoft.com/render/jenkins/"
 		options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
-		options['cis_tools'] = "RenderServiceScripts"
-		options['jenkins_job'] = "RenderServiceRenderJob"
+		options['scripts_branch'] = "egurin/render_service"
 	    }
 
 		def testTasks = [:]
