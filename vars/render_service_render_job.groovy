@@ -179,11 +179,11 @@ def main(String PCs, Map options) {
 	    if (PRODUCTION) {
 		options['django_url'] = "http://172.26.157.251:84/render/jenkins/"
 		options['plugin_storage'] = "https://render.cis.luxoft.com/media/plugins/"
-		options['scripts_branch'] = "egurin/render_service"
+		options['scripts_branch'] = "egurin/unpacking"
 	    } else {
 		options['django_url'] = "https://testrender.cis.luxoft.com/render/jenkins/"
 		options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
-		options['scripts_branch'] = "egurin/render_service"
+		options['scripts_branch'] = "egurin/unpacking"
 	    }
 
 		def testTasks = [:]
