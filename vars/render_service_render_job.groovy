@@ -19,11 +19,12 @@ def executeRender(osName, gpuName, Map options) {
 					'''
 					// Download render service scripts
 					try {
-					    print("Downloading scripts")
+					    print("Downloading scripts and install requirements")
 					    checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
-					    dir("..\\render_service_scripts\\install"){
+					    dir(".."){
+					    	checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
 					        bat '''
-                                install_pylibs.bat
+                                install/install_pylibs.bat
 					        '''
 					    }
 					} catch(e) {
