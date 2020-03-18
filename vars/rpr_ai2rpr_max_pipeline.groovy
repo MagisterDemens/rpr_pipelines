@@ -131,19 +131,8 @@ def executeTests(String osName, String asicName, Map options)
             bat "del convertAI2RPR.ms"
             unstash "convertionScript"
         }
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh /${options.PRJ_PATH}/ArnoldMaxAssets/ ${CIS_TOOLS}/../TestResources/ArnoldMaxAssets
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat /${options.PRJ_PATH}/ArnoldMaxAssets/ /mnt/c/TestResources/ArnoldMaxAssets
-            """
-        }
+
+        downloadAssets("/${options.PRJ_PATH}/ArnoldMaxAssets/", 'ArnoldMaxAssets')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"

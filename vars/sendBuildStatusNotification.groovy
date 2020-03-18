@@ -82,22 +82,4 @@ def call(String buildStatus = 'STARTED', String channel = '', String baseUrl = '
         println("Error during slack notification to project channel")
         println(e.toString())
     }
-
-    // send only failed jobs into separate channel
-    if (buildStatus == "FAILURE") {
-        String debagSlackMessage = """[{
-          "title": "${buildStatus}\\nCIS: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-          "title_link": "${env.BUILD_URL}",
-          "color": "${colorCode}",
-          "text": "Failed reason is ${options.failureMessage}"
-          }]
-        """;
-
-        try {
-           slackSend (attachments: debagSlackMessage, channel: env.debagChannel, baseUrl: env.debagUrl, tokenCredentialId: 'debug-channel')
-        } catch (e) {
-            println("Error during slack notification to debug channel")
-            println(e.toString())
-        }
-    }
 }

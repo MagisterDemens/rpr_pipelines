@@ -301,6 +301,7 @@ def executeTestCommand(String osName, Map options)
 
 def executeTests(String osName, String asicName, Map options)
 {
+    cleanWs(deleteDirs: true, disableDeferredWipeout: true)
     try {
         checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_blender.git')
 
@@ -310,19 +311,7 @@ def executeTests(String osName, String asicName, Map options)
             options.rbs_dev.setTester(options)
         }
 
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh ${options.PRJ_ROOT}/${options.PRJ_NAME}/Blender2.8Assets/ ${CIS_TOOLS}/../TestResources/Blender2.8Assets
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat ${options.PRJ_ROOT}/${options.PRJ_NAME}/Blender2.8Assets/ /mnt/c/TestResources/Blender2.8Assets
-            """
-        }
+        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Blender2.8Assets/", 'Blender2.8Assets')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"

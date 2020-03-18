@@ -188,19 +188,7 @@ def executeTests(String osName, String asicName, Map options)
     try {
         checkoutGit(options['testsBranch'], 'git@github.com:luxteam/jobs_test_maya.git')
 
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh ${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/ ${CIS_TOOLS}/../TestResources/GLTF_export/Maya
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat ${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/ /mnt/c/TestResources/GLTF_export/Maya
-            """
-        }
+        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/", 'GLTF_export/Maya')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"

@@ -17,9 +17,28 @@ def executeConvert(osName, gpuName, Map options) {
 						del /q *
 						for /d %%x in (*) do @rd /s /q "%%x"
 					''' 
+					// Download render service scripts
+					try {
+						    print("Downloading scripts and install requirements")
+						    checkOutBranchOrScm(options['scripts_branch'], 'git@github.com:luxteam/render_service_scripts.git')
+						    dir(".\\install"){
+						       bat '''
+							  install_pylibs.bat
+						       '''
+						    }
+					} catch(e) {
+						currentBuild.result = 'FAILURE'
+						print e
+						fail_reason = "Downloading scripts failed"
+					}
 					// download scene, check if it is already downloaded
 					try {
-						print(python3("${CIS_TOOLS}\\${options.cis_tools}\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
+					    // initialize directory RenderServiceStorage
+					    bat """
+						if not exist "..\\..\\RenderServiceStorage" mkdir "..\\..\\RenderServiceStorage"
+					    """
+					   
+						print(python3(".\\render_service_scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
 						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
@@ -28,53 +47,44 @@ def executeConvert(osName, gpuName, Map options) {
 							"""
 						} else {
 							withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'renderServiceCredentials', usernameVariable: 'DJANGO_USER', passwordVariable: 'DJANGO_PASSWORD']]) {
-								bat """ 
+								bat """
 									curl -o "${scene_name}" -u %DJANGO_USER%:%DJANGO_PASSWORD% "${options.Scene}"
 								"""
 							}
 							bat """
+							    if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
 								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}"
-								if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
 								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 							"""
 						}
 					} catch(e) {
+						currentBuild.result = 'FAILURE'
 						print e
-						fail_reason = "Downloading failed"
+						fail_reason = "Downloading scene failed"
 					}
 					
-					// unzip
-					try {
-						if ("${scene_name}".endsWith('.zip') || "${scene_name}".endsWith('.7z')) {
-							bat """
-								7z x "${scene_name}"
-							"""
-						}
-					} catch(e) {
-						print e
-						fail_reason = "Incorrect zip file"
-					}
 					
 					switch(tool) {
-						case 'Maya Redshift':
+						case 'Maya (Redshift)':
 							// update redshift 
 							bat """
-								cd "${CIS_TOOLS}\\..\\RenderServiceStorage\\RS2RPRConvertTool" 
-								git pull
-								cd "..\\..\\WS\\RenderServiceConvertJob"
-								copy "${CIS_TOOLS}\\..\\RenderServiceStorage\\RS2RPRConvertTool\\convertRS2RPR.py" "."
+								if not exist "RS2RPRConvertTool" mkdir "RS2RPRConvertTool"
 							"""
+							dir("RS2RPRConvertTool"){
+								checkOutBranchOrScm(options['convert_branch'], 'git@github.com:luxteam/RS2RPRConvertTool.git')
+							}
 							// copy necessary scripts for render
 									bat """
-										copy "${CIS_TOOLS}\\${options.cis_tools}\\launch_maya_redshift_conversion.py" "."
-										copy "${CIS_TOOLS}\\${options.cis_tools}\\conversion_redshift_render.py" "."
-										copy "${CIS_TOOLS}\\${options.cis_tools}\\conversion_rpr_render.py" "."
+										copy "render_service_scripts\\launch_maya_redshift_conversion.py" "."
+										copy "render_service_scripts\\conversion_redshift_render.py" "."
+										copy "render_service_scripts\\conversion_rpr_render.py" "."
 									"""
 							// Launch render
 							try {
-								python3("launch_maya_redshift_conversion.py --tool ${version} --django_ip \"${options.django_url}/\" --id ${id} --build_number ${currentBuild.number} ")
+								print(python3("launch_maya_redshift_conversion.py --tool ${version} --django_ip \"${options.django_url}/\" --id ${id} --build_number ${currentBuild.number} --scene_name \"${scene_name}\" "))
 							} catch(e) {
 								print e
+								currentBuild.result = 'FAILURE'
 								// if status == failure then copy full path and send to slack
 								bat """
 									mkdir "..\\..\\RenderServiceStorage\\failed_${scene_name}_${id}_${currentBuild.number}"
@@ -85,7 +95,6 @@ def executeConvert(osName, gpuName, Map options) {
 				
 					}   
 				} catch(e) {
-					currentBuild.result = 'FAILURE'
 					print e
 					print(python3("${CIS_TOOLS}\\${options.cis_tools}\\send_render_results.py --django_ip \"${options.django_url}/\" --build_number ${currentBuild.number} --status ${currentBuild.result} --fail_reason \"${fail_reason}\" --id ${id}"))
 				} 
@@ -110,13 +119,13 @@ def main(String PCs, Map options) {
 			if (PRODUCTION) {
 				options['django_url'] = "https://render.cis.luxoft.com/convert/jenkins/"
 				options['plugin_storage'] = "https://render.cis.luxoft.com/media/plugins/"
-				options['cis_tools'] = "RenderServiceScripts"
-				options['jenkins_job'] = "RenderServiceConvertJob"
+				options['scripts_branch'] = "master"
+				options['convert_branch'] = "master"
 			} else {
 				options['django_url'] = "https://testrender.cis.luxoft.com/convert/jenkins/"
 				options['plugin_storage'] = "https://testrender.cis.luxoft.com/media/plugins/"
-				options['cis_tools'] = "RenderServiceScripts"
-				options['jenkins_job'] = "RenderServiceConvertJob"
+				options['scripts_branch'] = "master"
+				options['convert_branch'] = "master"
 			}
 
 			def testTasks = [:]
@@ -125,38 +134,79 @@ def main(String PCs, Map options) {
 			String deviceName = tokens.get(1)
 
 			String renderDevice = ""
-		    if (deviceName == "ANY") {
+		        if (deviceName == "ANY") {
 				String tool = options['Tool'].split(':')[0].trim()
 				renderDevice = tool
-		    } else {
+		        } else {
 				renderDevice = "gpu${deviceName}"
-	    	}
+	    		}
 		
-			try {
-				echo "Scheduling Convert ${osName}:${deviceName}"
-				testTasks["Convert-${osName}-${deviceName}"] = {
-					node("${osName} && RenderService && ${renderDevice}") {
-						stage("Conversion") {
-							timeout(time: 65, unit: 'MINUTES') {
-								ws("WS/${options.PRJ_NAME}") {
-									executeConvert(osName, deviceName, options)
-								}
+			startConvert(osName, deviceName, renderDevice, options)
+		}
+    
+}
+
+def startConvert(osName, deviceName, renderDevice, options) {
+	def labels = "${osName} && RenderService && ${renderDevice}"
+	def nodesCount = getNodesCount(labels)
+	boolean successfullyDone = false
+
+	print("${options.maxAttempts}")
+	def maxAttempts = "${options.maxAttempts}".toInteger()
+	def testTasks = [:]
+	def currentLabels = labels
+	for (int attemptNum = 1; attemptNum <= maxAttempts && attemptNum <= nodesCount; attemptNum++) {
+		def currentNodeName = ""
+
+		echo "Scheduling Convert ${osName}:${deviceName}. Attempt #${attemptNum}"
+		testTasks["Convert-${osName}-${deviceName}"] = {
+			node(currentLabels) {
+				stage("Conversion") {
+					timeout(time: 65, unit: 'MINUTES') {
+						ws("WS/${options.PRJ_NAME}") {
+							currentNodeName =  "${env.NODE_NAME}"
+							try {
+								executeConvert(osName, deviceName, options)
+								successfullyDone = true
+							} catch (e) {
+								println(e.toString());
+								println(e.getMessage());
+								println(e.getStackTrace());
+								print e
+
+								//Exclude failed node name
+								currentLabels = currentLabels + " && !" + currentNodeName
+						    	println(currentLabels)
+						    	currentBuild.result = 'SUCCESS'
 							}
 						}
 					}
 				}
-
-				parallel testTasks
-
-			} catch(e) {
-				println(e.toString());
-				println(e.getMessage());
-				println(e.getStackTrace());
-				currentBuild.result = "FAILED"
-				print e
-			} 
+			}
 		}
-    
+
+		parallel testTasks	
+	    
+		if (successfullyDone) {
+			break
+		}
+	}
+
+	if (!successfullyDone) {
+		throw new Exception("Job was failed by all used nodes!")
+	}
+}
+
+def getNodesCount(labels) {
+	def nodes = jenkins.model.Jenkins.instance.getLabel(labels).getNodes()
+	def nodesCount = 0
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i].toComputer().isOnline()) {
+			nodesCount++
+		}
+	}
+
+	return nodesCount
 }
 	
 def call(String Tool = '',
@@ -164,7 +214,8 @@ def call(String Tool = '',
 	String PCs = '',
 	String id = '',
 	String sceneName = '',
-	String sceneUser = ''
+	String sceneUser = '',
+	String maxAttempts = ''
 	) {
 	String PRJ_ROOT='RenderServiceConvertJob'
 	String PRJ_NAME='RenderServiceConvertJob'  
@@ -176,6 +227,7 @@ def call(String Tool = '',
 		Scene:Scene,
 		id:id,
 		sceneName:sceneName,
-		sceneUser:sceneUser
+		sceneUser:sceneUser,
+		maxAttempts:maxAttempts
 		])
 	}

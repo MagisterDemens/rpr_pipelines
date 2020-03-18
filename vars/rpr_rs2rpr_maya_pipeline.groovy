@@ -134,19 +134,7 @@ def executeTests(String osName, String asicName, Map options)
             unstash "convertionScript"
         }
 
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh /${options.PRJ_PATH}/RedshiftAssets/ ${CIS_TOOLS}/../TestResources/RedshiftAssets
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat /${options.PRJ_PATH}/RedshiftAssets/ /mnt/c/TestResources/RedshiftAssets
-            """
-        }
+        downloadAssets("/${options.PRJ_PATH}/RedshiftAssets/", 'RedshiftAssets')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"

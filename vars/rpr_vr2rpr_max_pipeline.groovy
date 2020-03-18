@@ -132,19 +132,8 @@ def executeTests(String osName, String asicName, Map options)
             bat "del vray2rpr.ms"
             unstash "convertionScript"
         }
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh /${options.PRJ_PATH}/VrayAssets/ ${CIS_TOOLS}/../TestResources/VrayAssets
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat /${options.PRJ_PATH}/VrayAssets/ /mnt/c/TestResources/VrayAssets
-            """
-        }
+
+        downloadAssets("/${options.PRJ_PATH}/VrayAssets/", 'VrayAssets')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"

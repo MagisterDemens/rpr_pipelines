@@ -63,21 +63,9 @@ def executeTestCommand(String osName, Map options)
 
 def executeTests(String osName, String asicName, Map options)
 {
-    cleanWs()
+    cleanWs(deleteDirs: true, disableDeferredWipeout: true)
 
-    // update assets
-    if(isUnix())
-    {
-        sh """
-        ${CIS_TOOLS}/receiveFilesSync.sh ${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/ ${CIS_TOOLS}/../TestResources/RprViewer
-        """
-    }
-    else
-    {
-        bat """
-        %CIS_TOOLS%\\receiveFilesSync.bat ${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/ /mnt/c/TestResources/RprViewer
-        """
-    }
+    downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/", 'RprViewer')
 
     String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
     String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"
@@ -85,7 +73,7 @@ def executeTests(String osName, String asicName, Map options)
     options.REF_PATH_PROFILE = REF_PATH_PROFILE
 
     try {
-        checkOutBranchOrScm(options['testsBranch'], 'https://github.com/luxteam/jobs_test_rprviewer.git')
+        checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
         outputEnvironmentInfo(osName)
 
         unstash "app${osName}"
@@ -97,6 +85,16 @@ def executeTests(String osName, String asicName, Map options)
         } else {
             echo "Execute Tests"
             try {
+                if(options.testsPackage != "none" && !options.testsPackage.endsWith('.json')) {
+                    def tests = []
+                    String tempTests = readFile("jobs/${options.testsPackage}")
+                    tempTests.split("\n").each {
+                        // TODO: fix: duck tape - error with line ending
+                        tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+                    }
+                    options.tests = tests.join(" ")
+                    options.testsPackage = "none"
+                }
                 receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
                 options.tests.split(" ").each() {
                     receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
@@ -266,7 +264,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
     {
         if(options['executeTests'] && testResultList)
         {
-            checkOutBranchOrScm(options['testsBranch'], 'https://github.com/luxteam/jobs_test_rprviewer.git')
+            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
 
             dir("summaryTestResults")
             {
@@ -370,7 +368,7 @@ def call(String projectBranch = "",
 
     String PRJ_ROOT='rpr-core'
     String PRJ_NAME='RadeonProViewer'
-    String projectRepo='https://github.com/Radeon-Pro/RadeonProViewer.git'
+    String projectRepo='git@github.com:Radeon-Pro/RadeonProViewer.git'
 
     multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
                            [projectBranch:projectBranch,

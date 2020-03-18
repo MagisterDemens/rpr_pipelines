@@ -142,11 +142,12 @@ def executeTests(String osName, String asicName, Map options)
 
 def executeBuildWindows(Map options)
 {
+    String build_type = options['cmakeKeys'].contains("-DCMAKE_BUILD_TYPE=Debug") ? "Debug" : "Release"
     bat """
     mkdir Build
     cd Build
     cmake ${options['cmakeKeys']} -G "Visual Studio 15 2017 Win64" .. >> ..\\${STAGE_NAME}.log 2>&1
-    cmake --build . --target PACKAGE --config Release >> ..\\${STAGE_NAME}.log 2>&1
+    cmake --build . --target PACKAGE --config ${build_type} >> ..\\${STAGE_NAME}.log 2>&1
     rename BaikalNext.zip BaikalNext_${STAGE_NAME}.zip
     """
 }

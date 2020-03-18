@@ -4,6 +4,7 @@ def executeRender(osName, gpuName, Map options) {
 	String tool = options['Tool'].split(':')[0].trim()
 	String version = options['Tool'].split(':')[1].trim()
 	String scene_name = options['sceneName']
+   	String scene_user = options['sceneUser']
 	String fail_reason = "Unknown"
 
 	timeout(time: 65, unit: 'MINUTES') {
@@ -38,11 +39,11 @@ def executeRender(osName, gpuName, Map options) {
 					        writeFile file:'test', text:'dir created'
 					    }
 						print(python3("..\\Scripts\\send_render_status.py --django_ip \"${options.django_url}/\" --tool \"${tool}\" --status \"Downloading scene\" --id ${id}"))
-						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_name}"
+						def exists = fileExists "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 						if (exists) {
 							print("Scene is copying from Render Service Storage on this PC")
 							bat """
-								copy "..\\..\\RenderServiceStorage\\${scene_name}" "${scene_name}"
+								copy "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}" "${scene_name}"
 							"""
 						} else {
 							withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'renderServiceCredentials', usernameVariable: 'DJANGO_USER', passwordVariable: 'DJANGO_PASSWORD']]) {
@@ -51,7 +52,9 @@ def executeRender(osName, gpuName, Map options) {
 								"""
 							}
 							bat """
-								copy "${scene_name}" "..\\..\\RenderServiceStorage"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}"
+								if not exist "..\\..\\RenderServiceStorage\\${scene_user}\\" mkdir "..\\..\\RenderServiceStorage\\${scene_user}"
+								copy "${scene_name}" "..\\..\\RenderServiceStorage\\${scene_user}\\${scene_name}"
 							"""
 						}
 					} catch(e) {
@@ -162,7 +165,6 @@ def executeRender(osName, gpuName, Map options) {
 
 					}
 				} catch(e) {
-					currentBuild.result = 'FAILURE'
 					print e
 					print(python3("..\\Scripts\\send_render_results.py --django_ip \"${options.django_url}/\" --build_number ${currentBuild.number} --status ${currentBuild.result} --fail_reason \"${fail_reason}\" --id ${id}"))
 				}
@@ -204,31 +206,72 @@ def main(String PCs, Map options) {
 			renderDevice = "gpu${deviceName}"
 		}
 
-		try {
-			echo "Scheduling Render ${osName}:${deviceName}"
-			testTasks["Render-${osName}-${deviceName}"] = {
-				node("${osName} && RenderService && ${renderDevice}") {
-					stage("Render") {
-						timeout(time: 65, unit: 'MINUTES') {
-							ws("WS/${options.PRJ_NAME}_Render") {
+		startRender(osName, deviceName, options)
+	}
+
+}
+
+def startRender(osName, deviceName, options) {
+	def labels = "${osName} && RenderService"
+	def nodesCount = getNodesCount(labels)
+	boolean successfullyDone = false
+
+	print("${options.maxAttempts}")
+	def maxAttempts = "${options.maxAttempts}".toInteger()
+	def testTasks = [:]
+	def currentLabels = labels
+	for (int attemptNum = 1; attemptNum <= maxAttempts && attemptNum <= nodesCount; attemptNum++) {
+		def currentNodeName = ""
+
+		echo "Scheduling Render ${osName}:${deviceName}. Attempt #${attemptNum}"
+		testTasks["Render-${osName}-${deviceName}"] = {
+			node(currentLabels) {
+				stage("Render") {
+					timeout(time: 65, unit: 'MINUTES') {
+						ws("WS/${options.PRJ_NAME}_Render") {
+							currentNodeName =  "${env.NODE_NAME}"
+							try {
 								executeRender(osName, deviceName, options)
+								successfullyDone = true
+							} catch (e) {
+								println(e.toString());
+								println(e.getMessage());
+								println(e.getStackTrace());
+								print e
+
+								//Exclude failed node name
+								currentLabels = currentLabels + " && !" + currentNodeName
+						    	println(currentLabels)
+						    	currentBuild.result = 'SUCCESS'
 							}
 						}
 					}
 				}
 			}
+		}
 
-			parallel testTasks
-
-		} catch(e) {
-			println(e.toString());
-			println(e.getMessage());
-			println(e.getStackTrace());
-			currentBuild.result = "FAILED"
-			print e
+		parallel testTasks	
+	    
+		if (successfullyDone) {
+			break
 		}
 	}
 
+	if (!successfullyDone) {
+		throw new Exception("Job was failed by all used nodes!")
+	}
+}
+
+def getNodesCount(labels) {
+	def nodes = jenkins.model.Jenkins.instance.getLabel(labels).getNodes()
+	def nodesCount = 0
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i].toComputer().isOnline()) {
+			nodesCount++
+		}
+	}
+
+	return nodesCount
 }
 
 def call(String PCs = '',
@@ -236,6 +279,8 @@ def call(String PCs = '',
 		 String Tool = '',
 		 String Scene = '',
 		 String sceneName = '',
+		 String sceneUser = '',
+	     String maxAttempts = '',
 		 String Min_samples = '',
 		 String Max_samples = '',
 		 String Noise_threshold = '',
@@ -254,6 +299,8 @@ def call(String PCs = '',
 			Tool:Tool,
 			Scene:Scene,
 			sceneName:sceneName,
+			sceneUser:sceneUser,
+			maxAttempts:maxAttempts,
 			Min_Samples:Min_Samples,
 			Max_Samples:Max_Samples,
 			Noise_threshold:Noise_threshold,

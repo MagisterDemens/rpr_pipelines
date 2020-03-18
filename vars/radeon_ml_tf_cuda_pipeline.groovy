@@ -90,6 +90,8 @@ def executeBuildLinux(Map options)
         make -j >> ../../${STAGE_NAME}.log 2>&1
         make
         mv bin Release
+        
+        tar cf ${CIS_OS}_Release.tar Release
         """
     }
 }
@@ -155,16 +157,17 @@ def executeBuild(String osName, Map options)
         }
         outputEnvironmentInfo(osName)
 
-        switch(osName)
-        {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        case 'OSX':
-            executeBuildOSX(options);
-            break;
-        default:
-            executeBuildLinux(options);
+        withEnv(["CIS_OS=${osName}"]) {
+            switch (osName) {
+                case 'Windows':
+                    executeBuildWindows(options);
+                    break;
+                case 'OSX':
+                    executeBuildOSX(options);
+                    break;
+                default:
+                    executeBuildLinux(options);
+            }
         }
 
         stash includes: 'RadeonML/build/Release/**/*', name: "app${osName}"
@@ -187,6 +190,7 @@ def executeBuild(String osName, Map options)
         archiveArtifacts "${STAGE_NAME}.log"
         dir('RadeonML') {
             zip archive: true, dir: 'build/Release', glob: '', zipFile: "${osName}_Release.zip"
+            archiveArtifacts "build/${osName}_Release.tar"
         }
     }
 }

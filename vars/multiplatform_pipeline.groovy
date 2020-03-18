@@ -79,6 +79,7 @@ def executePlatform(String osName, String gpuNames, def executeBuild, def execut
             println(e.toString());
             println(e.getMessage());
             currentBuild.result = "FAILED"
+            options.FAILED_STAGES.add("e.toString()")
             throw e
         }
     }
@@ -125,6 +126,8 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
             options['BUILD_TIMEOUT'] = options['BUILD_TIMEOUT'] ?: 60
             options['TEST_TIMEOUT'] = options['TEST_TIMEOUT'] ?: 60
             options['DEPLOY_TIMEOUT'] = options['DEPLOY_TIMEOUT'] ?: 60
+
+            options['FAILED_STAGES'] = []
 
             def platformList = [];
             def testResultList = [];
@@ -200,23 +203,6 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                                     {
                                         executeDeploy(options, platformList, testResultList)
                                     }
-                                    /*dir('_publish_artifacts_html_')
-                                    {
-                                        deleteDir()
-                                        appendHtmlLinkToFile("artifacts.html", "${options.PRJ_PATH}",
-                                                             "https://builds.rpr.cis.luxoft.com/${options.PRJ_PATH}")
-                                        appendHtmlLinkToFile("artifacts.html", "${options.REF_PATH}",
-                                                             "https://builds.rpr.cis.luxoft.com/${options.REF_PATH}")
-                                        appendHtmlLinkToFile("artifacts.html", "${options.JOB_PATH}",
-                                                             "https://builds.rpr.cis.luxoft.com/${options.JOB_PATH}")
-
-                                        archiveArtifacts "artifacts.html"
-                                    }
-                                    publishHTML([allowMissing: false,
-                                                 alwaysLinkToLastBuild: false,
-                                                 keepAll: true,
-                                                 reportDir: '_publish_artifacts_html_',
-                                                 reportFiles: 'artifacts.html', reportName: 'Project\'s Artifacts', reportTitles: 'Artifacts'])*/
                                 }
                                 catch (e) {
                                     println(e.toString());
@@ -235,9 +221,8 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
     {
         println(e.toString());
         println(e.getMessage());
-        // options.CBR = "ABORTED"
         currentBuild.result = "ABORTED"
-        echo "Job was ABORTED by user: ${currentBuild.result}"
+        echo "Job was ABORTED by user. Job status: ${currentBuild.result}"
     }
     catch (e)
     {
@@ -257,5 +242,8 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                                         options.get('slackTocken', ''),
                                         options)
         }
+
+        echo "Send Slack message to debug channels"
+        sendBuildStatusToDebugSlack(options)
     }
 }

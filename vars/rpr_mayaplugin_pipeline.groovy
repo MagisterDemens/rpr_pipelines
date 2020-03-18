@@ -160,38 +160,11 @@ def installPlugin(String osName, Map options)
     }
 }
 
-def buildRenderCache(String osName, String log_name=env.STAGE_NAME, String toolVersion)
-{
-    timeout(time: "5", unit: 'MINUTES') {
-        switch(osName) {
-            case 'Windows':
-                dir("scripts") {
-                    bat "build_rpr_cache.bat ${toolVersion} >> ..\\${log_name}  2>&1"
-                }
-                break;
-            case 'OSX':
-                dir("scripts") {
-                    sh "./build_rpr_cache.sh ${toolVersion} >> ../${log_name} 2>&1"
-                }
-                break;
-            default:
-                echo "pass"
-        }
-    }
-}
-
 def executeTestCommand(String osName, Map options)
 {
     if (!options['skipBuild'])
     {
         installPlugin(osName, options)
-        //duct tape for migration to maya2019
-        try {
-            buildRenderCache(osName, "${options.stageName}.buildCache.log", "${options.toolVersion}")
-        } catch(e) {
-            println(e.toString())
-            println("ERROR during building render cache")
-        }
     }
 
     switch(osName)
@@ -221,6 +194,7 @@ def executeTestCommand(String osName, Map options)
 
 def executeTests(String osName, String asicName, Map options)
 {
+    cleanWs(deleteDirs: true, disableDeferredWipeout: true)
     try {
         checkoutGit(options['testsBranch'], 'git@github.com:luxteam/jobs_test_maya.git')
 
@@ -230,19 +204,7 @@ def executeTests(String osName, String asicName, Map options)
             options.rbs_dev.setTester(options)
         }
 
-        // update assets
-        if(isUnix())
-        {
-            sh """
-            ${CIS_TOOLS}/receiveFilesSync.sh ${options.PRJ_ROOT}/${options.PRJ_NAME}/MayaAssets/ ${CIS_TOOLS}/../TestResources/MayaAssets
-            """
-        }
-        else
-        {
-            bat """
-            %CIS_TOOLS%\\receiveFilesSync.bat ${options.PRJ_ROOT}/${options.PRJ_NAME}/MayaAssets/ /mnt/c/TestResources/MayaAssets
-            """
-        }
+        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/MayaAssets/", 'MayaAssets')
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"
@@ -379,7 +341,7 @@ def executeBuildOSX(Map options)
             }
             archiveArtifacts "RadeonProRender*.dmg"
             String BUILD_NAME = branch_postfix ? "RadeonProRenderMaya_${options.pluginVersion}.(${branch_postfix}).dmg" : "RadeonProRenderMaya_${options.pluginVersion}.dmg"
-            rtp nullAction: '1', parserName: 'HTML', stableText: """<h3><a href="${BUILD_URL}/artifact/${BUILD_NAME}">${BUILD_NAME}</a></h3>"""
+            rtp nullAction: '1', parserName: 'HTML', stableText: """<h3><a href="${BUILD_URL}/artifact/${BUILD_NAME}">[BUILD: ${BUILD_ID}] ${BUILD_NAME}</a></h3>"""
 
             sh "cp RadeonProRender*.dmg RadeonProRenderForMaya.dmg"
             stash includes: 'RadeonProRenderForMaya.dmg', name: "appOSX"

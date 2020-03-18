@@ -97,6 +97,8 @@ def executeBuildLinux(Map options)
     make -j >> ../${STAGE_NAME}.Release.log 2>&1
     mv bin Release
     cp ../third_party/miopen/libMIOpen.so* ./Release
+    
+    tar cf ${CIS_OS}_Release.tar Release
     """
 
     sh """
@@ -163,16 +165,17 @@ def executeBuild(String osName, Map options)
         outputEnvironmentInfo(osName, "${STAGE_NAME}.Release")
         outputEnvironmentInfo(osName, "${STAGE_NAME}.Debug")
 
-        switch(osName)
-        {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        case 'OSX':
-            executeBuildOSX(options);
-            break;
-        default:
-            executeBuildLinux(options);
+        withEnv(["CIS_OS=${osName}"]) {
+            switch (osName) {
+                case 'Windows':
+                    executeBuildWindows(options);
+                    break;
+                case 'OSX':
+                    executeBuildOSX(options);
+                    break;
+                default:
+                    executeBuildLinux(options);
+            }
         }
 
         stash includes: 'build-direct/Release/**/*', name: "app${osName}"
@@ -195,6 +198,7 @@ def executeBuild(String osName, Map options)
         archiveArtifacts "${STAGE_NAME}.*.log"
         zip archive: true, dir: 'build-direct/Release', glob: '', zipFile: "${osName}_Release.zip"
         zip archive: true, dir: 'build-direct-debug/Debug', glob: '', zipFile: "${osName}_Debug.zip"
+        archiveArtifacts "build-direct/${osName}_Release.tar"
     }
 }
 

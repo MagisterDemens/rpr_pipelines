@@ -71,6 +71,8 @@ def executeBuildOSX(Map options)
     cd build
     cmake ${options['cmakeKeys']} .. >> ../${STAGE_NAME}.Release.log 2>&1
     make -j >> ../${STAGE_NAME}.Release.log 2>&1
+
+    tar cf ${CIS_OS}_Release.tar bin
     """
 }
 
@@ -134,15 +136,17 @@ def executeBuild(String osName, Map options)
             pullRequest.createStatus("pending", context, "Checkout has been finished. Trying to build...", "${env.JOB_URL}")
         }
 
-        switch(osName) {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        case 'OSX':
-            executeBuildOSX(options);
-            break;
-        default:
-            executeBuildLinux(options);
+        withEnv(["CIS_OS=${osName}"]) {
+            switch (osName) {
+                case 'Windows':
+                    executeBuildWindows(options);
+                    break;
+                case 'OSX':
+                    executeBuildOSX(options);
+                    break;
+                default:
+                    executeBuildLinux(options);
+            }
         }
 
         stash includes: 'build/bin/*', name: "app${osName}"
@@ -162,6 +166,7 @@ def executeBuild(String osName, Map options)
 
         archiveArtifacts "${STAGE_NAME}.*.log"
         zip archive: true, dir: 'build/bin', zipFile: "${osName}_Release.zip"
+        archiveArtifacts "build/${osName}_Release.tar"
     }
 }
 
