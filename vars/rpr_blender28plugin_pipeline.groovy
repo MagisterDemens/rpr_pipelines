@@ -552,8 +552,8 @@ def executePreBuild(Map options)
 
             options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ').replace(', ', '.')
 
-            currentBuild.description += "<b>Project branch:</b> ${options.projectBranch}<br/>"
-            currentBuild.description += "<b>Version:</b> ${options.tanVersion}<br/>"
+            currentBuild.description = "<b>Project branch:</b> ${options.projectBranch}<br/>"
+            currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
             currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
             currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
             currentBuild.description += "<b>Commit SHA:</b> ${options.commitShortSHA}<br/>"
