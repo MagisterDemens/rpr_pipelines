@@ -516,6 +516,7 @@ def executePreBuild(Map options)
         options.executeTests = true
     // auto job
     } else {
+        options.projectBranch = env.BRANCH_NAME
         if (env.CHANGE_URL) {
             println "[INFO] Branch was detected as Pull Request"
             options.isPR = true
@@ -537,11 +538,11 @@ def executePreBuild(Map options)
         
         dir('RadeonProRenderBlenderAddon')
         {
-            checkOutBranchOrScm(env.BRANCH_NAME, 'git@github.com:Radeon-Pro/RadeonProRenderBlenderAddon.git', true)
+            checkOutBranchOrScm(options.projectBranch, 'git@github.com:Radeon-Pro/RadeonProRenderBlenderAddon.git', true)
 
             options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
             options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
-            options.commitSHA = bat(script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+            options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
             options.commitShortSHA = options.commitSHA[0..6]
 
             println "The last commit was written by ${options.commitAuthor}."
