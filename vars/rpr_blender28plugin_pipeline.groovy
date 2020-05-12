@@ -507,129 +507,147 @@ def executePreBuild(Map options)
         //plugin is pre built
         options['executeBuild'] = false
         options['executeTests'] = true
-        return;
+        return
     }
 
-    currentBuild.description = ""
-    ['projectBranch'].each
-    {
-        if(options[it] != 'master' && options[it] != "")
-        {
-            currentBuild.description += "<b>${it}:</b> ${options[it]}<br/>"
+    // manual job
+    if (options.forceBuild) {
+        options.executeBuild = true
+        options.executeTests = true
+    // auto job
+    } else {
+        if (env.CHANGE_URL) {
+            println "[INFO] Branch was detected as Pull Request"
+            options.isPR = true
+            options.executeBuild = true
+            options.executeTests = true
+            options.testsPackage = "regression.json"
+        } else if (env.BRANCH_NAME == "master") {
+           println "[INFO] master branch was detected"
+           options.executeBuild = true
+           options.executeTests = true
+           options.testsPackage = "regression.json"
+        } else {
+            println "[INFO] ${env.BRANCH_NAME} branch was detected"
+            options.testsPackage = "smoke"
         }
     }
 
-    dir('RadeonProRenderBlenderAddon')
-    {
-        checkOutBranchOrScm(options['projectBranch'], 'git@github.com:Radeon-Pro/RadeonProRenderBlenderAddon.git', true)
-
-        AUTHOR_NAME = bat (
-                script: "git show -s --format=%%an HEAD ",
-                returnStdout: true
-                ).split('\r\n')[2].trim()
-
-        echo "The last commit was written by ${AUTHOR_NAME}."
-        options.AUTHOR_NAME = AUTHOR_NAME
-
-        commitMessage = bat ( script: "git log --format=%%B -n 1", returnStdout: true )
-        echo "Commit message: ${commitMessage}"
-
-        options.commitMessage = commitMessage.split('\r\n')[2].trim()
-        echo "Opt.: ${options.commitMessage}"
-        options['commitSHA'] = bat(script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-        options['commitShortSHA'] = options['commitSHA'][0..6]
-
-        if(options['incrementVersion'])
+    if (!env.CHANGE_URL){
+        
+        dir('RadeonProRenderBlenderAddon')
         {
-            if("${BRANCH_NAME}" == "master" && "${AUTHOR_NAME}" != "radeonprorender")
-            {
-                options.testsPackage = "regression.json"
-                echo "Incrementing version of change made by ${AUTHOR_NAME}."
+            checkOutBranchOrScm(env.BRANCH_NAME, 'git@github.com:Radeon-Pro/RadeonProRenderBlenderAddon.git', true)
 
-                String currentversion=version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ')
-                echo "currentversion ${currentversion}"
+            options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
+            options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
+            options.commitSHA = bat(script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+            options.commitShortSHA = options.commitSHA[0..6]
 
-                new_version=version_inc(currentversion, 3, ', ')
-                echo "new_version ${new_version}"
+            println "The last commit was written by ${options.commitAuthor}."
+            println "Commit message: ${options.commitMessage}"
+            println "Commit SHA: ${options.commitSHA}"
+            println "Commit shortSHA: ${options.commitShortSHA}"
 
-                version_write("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', new_version, ', ')
+            options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ').replace(', ', '.')
 
-                String updatedversion=version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ', "true")
-                echo "updatedversion ${updatedversion}"
+            currentBuild.description += "<b>Project branch:</b> ${options.projectBranch}<br/>"
+            currentBuild.description += "<b>Version:</b> ${options.tanVersion}<br/>"
+            currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
+            currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+            currentBuild.description += "<b>Commit SHA:</b> ${options.commitShortSHA}<br/>"
 
-                bat """
-                    git add src/rprblender/__init__.py
-                    git commit -m "buildmaster: version update to ${updatedversion}"
-                    git push origin HEAD:master
-                   """
-
-                //get commit's sha which have to be build
-                options['projectBranch'] = bat ( script: "git log --format=%%H -1 ",
-                                    returnStdout: true
-                                    ).split('\r\n')[2].trim()
-
-                options['executeBuild'] = true
-                options['executeTests'] = true
-            }
-            else
-            {
-                options.testsPackage = "smoke"
-                if(commitMessage.contains("CIS:BUILD"))
-                {
-                    options['executeBuild'] = true
-                }
-
-                if(commitMessage.contains("CIS:TESTS"))
-                {
-                    options['executeBuild'] = true
-                    options['executeTests'] = true
-                }
-
-                if (env.CHANGE_URL)
-                {
-                    echo "branch was detected as Pull Request"
-                    options['isPR'] = true
-                    options['executeBuild'] = true
-                    options['executeTests'] = true
+            if (options['incrementVersion']) {
+                if(env.BRANCH_NAME == "master" && options.commitAuthor != "radeonprorender") {
                     options.testsPackage = "regression.json"
-                }
 
-                if("${BRANCH_NAME}" == "master")
+                    println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
+
+                    def current_version = version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ')
+                    println "[INFO] Current build version: ${current_version}"
+
+                    def new_version = version_inc(currentversion, 3, ', ')
+                    println "[INFO] New build version: ${new_version}"
+
+                    version_write("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', new_version, ', ')
+                    def updated_version = version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ', "true")
+                    println "[INFO] Updated build version: ${updated_version}"
+
+                    bat """
+                        git add src/rprblender/__init__.py
+                        git commit -m "buildmaster: version update to ${updatedversion}"
+                        git push origin HEAD:${env.BRANCH_NAME}
+                    """
+
+                    //get commit's sha which have to be build
+                    options['projectBranch'] = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+                }
+                else
                 {
-                   echo "rebuild master"
-                   options['executeBuild'] = true
-                   options['executeTests'] = true
-                   options.testsPackage = "regression.json"
+                    if(commitMessage.contains("CIS:BUILD"))
+                    {
+                        options['executeBuild'] = true
+                    }
+
+                    if(commitMessage.contains("CIS:TESTS"))
+                    {
+                        options['executeBuild'] = true
+                        options['executeTests'] = true
+                    }
                 }
             }
+            
         }
-        options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderBlenderAddon\\src\\rprblender\\__init__.py", '"version": (', ', ').replace(', ', '.')
     }
 
-    if(env.CHANGE_URL)
+    def tests = []
+    options.groupsRBS = []
+    if (options.testsPackage != "none")
     {
-        //TODO: fix sha for PR
-        //options.comitSHA = bat ( script: "git log --format=%%H HEAD~1 -1", returnStdout: true ).split('\r\n')[2].trim()
-        options.AUTHOR_NAME = env.CHANGE_AUTHOR_DISPLAY_NAME
-        if (env.CHANGE_TARGET != 'master') {
-            options['executeBuild'] = true
-            options['executeTests'] = true
+        dir('jobs_test_blender')
+        {
+            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_blender.git')
+            // json means custom test suite. Split doesn't supported
+            if(options.testsPackage.endsWith('.json'))
+            {
+                def testsByJson = readJSON file: "jobs/${options.testsPackage}"
+                testsByJson.each() {
+                    options.groupsRBS << "${it.key}"
+                }
+                options.splitTestsExecution = false
+            } else {
+                // options.splitTestsExecution = false
+                String tempTests = readFile("jobs/${options.testsPackage}")
+                tempTests.split("\n").each {
+                    // TODO: fix: duck tape - error with line ending
+                    tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
+                }
+                options.tests = tests
+                options.testsPackage = "none"
+                options.groupsRBS = tests
+            }
         }
-        options.commitMessage = env.CHANGE_TITLE
-    }
-    
-    // if manual job
-    if(options['forceBuild'])
-    {
-        options['executeBuild'] = true
-        options['executeTests'] = true
+    } else {
+        options.tests.split(" ").each() {
+            tests << "${it}"
+        }
+        options.tests = tests
+        options.groupsRBS = tests
     }
 
-    currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
-    if(!env.CHANGE_URL)
-    {
-        currentBuild.description += "<b>Commit author:</b> ${options.AUTHOR_NAME}<br/>"
-        currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+    if (options.splitTestsExecution) {
+        options.testsList = options.tests
+    } else {
+        options.testsList = ['']
+        options.tests = tests.join(" ")
+    }
+
+    if (options.sendToRBS) {
+        try {
+            options.rbs_prod.startBuild(options)
+        } catch (e) {
+            println(e.toString())
+        }
     }
 
     if (env.BRANCH_NAME && env.BRANCH_NAME == "master") {
@@ -648,65 +666,6 @@ def executePreBuild(Map options)
         properties([[$class: 'BuildDiscarderProperty', strategy:
                          [$class: 'LogRotator', artifactDaysToKeepStr: '',
                           artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '20']]]);
-    }
-
-    
-    def tests = []
-    options.groupsRBS = []
-    if(options.testsPackage != "none")
-    {
-        dir('jobs_test_blender')
-        {
-            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_blender.git')
-            // json means custom test suite. Split doesn't supported
-            if(options.testsPackage.endsWith('.json'))
-            {
-                def testsByJson = readJSON file: "jobs/${options.testsPackage}"
-                testsByJson.each() {
-                    options.groupsRBS << "${it.key}"
-                }
-                options.splitTestsExecution = false
-            }
-            else {
-                // options.splitTestsExecution = false
-                String tempTests = readFile("jobs/${options.testsPackage}")
-                tempTests.split("\n").each {
-                    // TODO: fix: duck tape - error with line ending
-                    tests << "${it.replaceAll("[^a-zA-Z0-9_]+","")}"
-                }
-                options.tests = tests
-                options.testsPackage = "none"
-                options.groupsRBS = tests
-            }
-        }
-    }
-    else {
-        options.tests.split(" ").each()
-        {
-            tests << "${it}"
-        }
-        options.tests = tests
-        options.groupsRBS = tests
-    }
-
-    if(options.splitTestsExecution) {
-        options.testsList = options.tests
-    }
-    else {
-        options.testsList = ['']
-        options.tests = tests.join(" ")
-    }
-
-    if (options.sendToRBS)
-    {
-        try
-        {
-            options.rbs_prod.startBuild(options)
-        }
-        catch (e)
-        {
-            println(e.toString())
-        }
     }
 }
 
