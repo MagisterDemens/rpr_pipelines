@@ -7,53 +7,53 @@ def getMayaPluginInstaller(String osName, Map options)
         case 'Windows':
 
             if (options['isPreBuilt']) {
-                if (options.pluginWinSha) {
-                    win_addon_name = options.pluginWinSha
-                } else {
-                    win_addon_name = "unknown"
-                }
-            } else {
-                win_addon_name = options.productCode
-            }
 
-            if (!fileExists("${CIS_TOOLS}/../PluginsBinaries/${win_addon_name}.msi")) {
+                if (!options.pluginWinSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginWinSha}.msi")) {
 
-                clearBinariesWin()
+                    clearBinariesWin()
 
-                if (options['isPreBuilt']) {
                     println "[INFO] The plugin does not exist in the storage. Downloading and copying..."
                     downloadPlugin(osName, "Maya", options)
-                    win_addon_name = options.pluginWinSha
+                    
+                    bat """
+                        IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
+                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
+                    """
+
                 } else {
-                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
-                    unstash "appWindows"
+                    println "[INFO] The plugin ${options.pluginWinSha}.msi exists in the storage."
                 }
 
-                bat """
-                    IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
-                    move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${win_addon_name}.msi"
-                """
-
             } else {
-                println "[INFO] The plugin ${win_addon_name}.msi exists in the storage."
+
+                if (!options.productCode && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.productCode}.msi")) {
+
+                    clearBinariesWin()
+
+                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
+                    unstash "appWindows"
+                    
+                    bat """
+                        IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
+                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.productCode}.msi"
+                    """
+
+                } else {
+                    println "[INFO] The plugin ${options.productCode}.msi exists in the storage."
+                }
             }
 
             break;
 
         case "OSX":
 
-            if (!options.pluginOSXSha) {
-                options.pluginOSXSha = "unknown"
-            }
-
-            if(!fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"))
+            if(!options.pluginOSXSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"))
             {
                 clearBinariesUnix()
 
                 if (options['isPreBuilt']) {
                     println "[INFO] The plugin does not exist in the storage. Downloading and copying..."
                     downloadPlugin(osName, "Maya", options)
-                    osx_addon_name = options.pluginOSXSha
                 } else {
                     println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
                     unstash "appOSX"
