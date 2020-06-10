@@ -404,12 +404,11 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    if (options['isPreBuilt'])
+    if (options.isPreBuilt)
     {
         //plugin is pre built
         options['executeBuild'] = false
         options['executeTests'] = true
-        return
     }
 
     // manual job
@@ -435,72 +434,74 @@ def executePreBuild(Map options)
         }
     }
     
-    dir('RadeonProRenderMayaPlugin')
-    {
-        checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
+    if (!options.isPreBuilt) {
+        dir('RadeonProRenderMayaPlugin')
+        {
+            checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
 
-        options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
-        options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
-        options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-        options.commitShortSHA = options.commitSHA[0..6]
+            options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
+            options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
+            options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+            options.commitShortSHA = options.commitSHA[0..6]
 
-        println "The last commit was written by ${options.commitAuthor}."
-        println "Commit message: ${options.commitMessage}"
-        println "Commit SHA: ${options.commitSHA}"
-        println "Commit shortSHA: ${options.commitShortSHA}"
+            println "The last commit was written by ${options.commitAuthor}."
+            println "Commit message: ${options.commitMessage}"
+            println "Commit SHA: ${options.commitSHA}"
+            println "Commit shortSHA: ${options.commitShortSHA}"
 
-        if (options.projectBranch){
-            currentBuild.description = "<b>Project branch:</b> ${options.projectBranch}<br/>"
-        } else {
-            currentBuild.description = "<b>Project branch:</b> ${env.BRANCH_NAME}<br/>"
-        }
-
-        options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION')
-
-        if (options['incrementVersion']) {
-            if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
-
-                println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
-                println "[INFO] Current build version: ${options.pluginVersion}"
-
-                def new_version = version_inc(options.pluginVersion, 3)
-                println "[INFO] New build version: ${new_version}"
-                version_write("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION', new_version)
-                
-                options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION')
-                println "[INFO] Updated build version: ${options.pluginVersion}"
-
-                bat """
-                  git add version.h
-                  git commit -m "buildmaster: version update to ${options.pluginVersion}"
-                  git push origin HEAD:develop
-                """
-
-                //get commit's sha which have to be build
-                options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-                options.projectBranch = options.commitSHA
-                println "[INFO] Project branch hash: ${options.projectBranch}"
+            if (options.projectBranch){
+                currentBuild.description = "<b>Project branch:</b> ${options.projectBranch}<br/>"
+            } else {
+                currentBuild.description = "<b>Project branch:</b> ${env.BRANCH_NAME}<br/>"
             }
-            else
-            {
-                if(options.commitMessage.contains("CIS:BUILD"))
-                {
-                    options['executeBuild'] = true
-                }
 
-                if(options.commitMessage.contains("CIS:TESTS"))
+            options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION')
+
+            if (options['incrementVersion']) {
+                if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
+
+                    println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
+                    println "[INFO] Current build version: ${options.pluginVersion}"
+
+                    def new_version = version_inc(options.pluginVersion, 3)
+                    println "[INFO] New build version: ${new_version}"
+                    version_write("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION', new_version)
+                    
+                    options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMayaPlugin\\version.h", '#define PLUGIN_VERSION')
+                    println "[INFO] Updated build version: ${options.pluginVersion}"
+
+                    bat """
+                      git add version.h
+                      git commit -m "buildmaster: version update to ${options.pluginVersion}"
+                      git push origin HEAD:develop
+                    """
+
+                    //get commit's sha which have to be build
+                    options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+                    options.projectBranch = options.commitSHA
+                    println "[INFO] Project branch hash: ${options.projectBranch}"
+                }
+                else
                 {
-                    options['executeBuild'] = true
-                    options['executeTests'] = true
+                    if(options.commitMessage.contains("CIS:BUILD"))
+                    {
+                        options['executeBuild'] = true
+                    }
+
+                    if(options.commitMessage.contains("CIS:TESTS"))
+                    {
+                        options['executeBuild'] = true
+                        options['executeTests'] = true
+                    }
                 }
             }
+
+            currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
+            currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
+            currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+            currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
+
         }
-
-        currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
-        currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
-        currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
-        currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
-
     }
 
     if (env.BRANCH_NAME && (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop")) {
