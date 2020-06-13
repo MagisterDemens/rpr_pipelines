@@ -404,13 +404,6 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    if (options.isPreBuilt)
-    {
-        //plugin is pre built
-        options['executeBuild'] = false
-        options['executeTests'] = true
-    }
-
     // manual job
     if (options.forceBuild) {
         options.executeBuild = true
@@ -578,6 +571,13 @@ def executePreBuild(Map options)
             println(e.toString())
         }
     }
+
+    if (options.isPreBuilt)
+    {
+        //plugin is pre built
+        options['executeBuild'] = false
+    }
+
 }
 
 def executeDeploy(Map options, List platformList, List testResultList)
