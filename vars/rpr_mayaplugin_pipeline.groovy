@@ -26,7 +26,7 @@ def getMayaPluginInstaller(String osName, Map options)
 
             } else {
 
-                if (!options.productCode && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.productCode}.msi")) {
+                if (options.productCode && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.productCode}.msi")) {
 
                     clearBinariesWin()
 
