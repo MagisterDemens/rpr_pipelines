@@ -33,7 +33,7 @@ def call(String osName, String tool, Map options, String credentialsId = '')
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '"${customBuildLink}"'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \"${customBuildLink}\"
                 """
             }
         }
@@ -47,7 +47,7 @@ def call(String osName, String tool, Map options, String credentialsId = '')
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '"${customBuildLink}"'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \"${customBuildLink}\"
                 """
             }
         }
