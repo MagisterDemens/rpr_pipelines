@@ -128,7 +128,7 @@ def getBlenderAddonInstaller(String osName, Map options)
                 }
 
             }
-        }
+        
     }
 }
 
