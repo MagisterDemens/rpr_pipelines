@@ -47,25 +47,41 @@ def getMayaPluginInstaller(String osName, Map options)
 
         case "OSX":
 
-            if(!options.pluginOSXSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"))
-            {
-                clearBinariesUnix()
+            if (options['isPreBuilt']) {
 
-                if (options['isPreBuilt']) {
+                if(!options.pluginOSXSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"))
+                {
+                    clearBinariesUnix()
+
                     println "[INFO] The plugin does not exist in the storage. Downloading and copying..."
                     downloadPlugin(osName, "Maya", options)
+                    
+                    sh """
+                        mkdir -p "${CIS_TOOLS}/../PluginsBinaries"
+                        mv RadeonProRenderMaya*.dmg "${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"
+                    """
+
                 } else {
-                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
-                    unstash "appOSX"
+                    println "[INFO] The plugin ${options.pluginOSXSha}.dmg exists in the storage."
                 }
 
-                sh """
-                    mkdir -p "${CIS_TOOLS}/../PluginsBinaries"
-                    mv RadeonProRenderMaya*.dmg "${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"
-                """
-
             } else {
-                println "[INFO] The plugin ${options.pluginOSXSha}.dmg exists in the storage."
+
+                if(options.pluginOSXSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"))
+                {
+                    clearBinariesUnix()
+
+                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
+                    unstash "appOSX"
+
+                    sh """
+                        mkdir -p "${CIS_TOOLS}/../PluginsBinaries"
+                        mv RadeonProRenderMaya*.dmg "${CIS_TOOLS}/../PluginsBinaries/${options.pluginOSXSha}.dmg"
+                    """
+
+                } else {
+                    println "[INFO] The plugin ${options.pluginOSXSha}.dmg exists in the storage."
+                }
             }
 
             break;
