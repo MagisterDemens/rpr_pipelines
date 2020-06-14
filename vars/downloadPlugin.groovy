@@ -6,15 +6,15 @@ def call(String osName, String tool, Map options, String credentialsId = '')
     switch(osName)
     {
         case 'Windows':
-            customBuildLink = options['customBuildLinkWindows']
+            customBuildLink = options.customBuildLinkWindows
             extentsion = "msi"
             break;
         case 'OSX':
-            customBuildLink = options['customBuildLinkOSX']
+            customBuildLink = options.customBuildLinkOSX
             extentsion = "dmg"
             break;
         default:
-            customBuildLink = options['customBuildLinkLinux']
+            customBuildLink = options.customBuildLinkLinux
             extentsion = "run"
     }
 
@@ -29,11 +29,15 @@ def call(String osName, String tool, Map options, String credentialsId = '')
         withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'builsRPRCredentials', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
             if (osName == "Windows") {
                 bat """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${customBuildLink}"
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkWindows}"
+                """
+            } else if (osName == "OSX") {
+                sh """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkOSX}"
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \\${customBuildLink}\\
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkLinux}"
                 """
             }
         }
@@ -43,10 +47,17 @@ def call(String osName, String tool, Map options, String credentialsId = '')
         withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'jenkinsUser', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
             if (osName == "Windows") {
                 bat """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${customBuildLink}"
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkWindows}"
+                """
+            } else if (osName == "OSX") {
+                echo options.customBuildLinkOSX
+                sh """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkOSX}"
                 """
             } else {
-                sh 'curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \\"${customBuildLink}\\"'
+                sh """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkLinux}"
+                """
             }
         }
     }
@@ -55,28 +66,33 @@ def call(String osName, String tool, Map options, String credentialsId = '')
         if (credentialsId) {
             withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: credentialsId, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
                 if (osName == "Windows") {
-                    if (credentialsId) {
-                        bat """
-                            curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${customBuildLink}"
-                        """
-                    } else {
-                        sh """
-                            curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${customBuildLink}"
-                        """
-                    }
+                    bat """
+                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkWindows}"
+                    """
+                } else if (osName == "OSX") {
+                    sh """
+                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkOSX}"
+                    """
+                } else {
+                    sh """
+                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${options.customBuildLinkLinux}"
+                    """
                 }
             }
         } else {
             if (osName == "Windows") {
-                if (credentialsId) {
-                    bat """
-                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${customBuildLink}"
-                    """
-                } else {
-                    sh """
-                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${customBuildLink}"
-                    """
-                }
+                bat """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${options.customBuildLinkWindows}"
+                """
+            } else if (osName == "OSX") {
+                echo options.customBuildLinkOSX
+                sh """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${options.customBuildLinkOSX}"
+                """
+            } else {
+                sh """
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${options.customBuildLinkLinux}"
+                """
             }
         }
     }
