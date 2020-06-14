@@ -19,7 +19,7 @@ def getMayaPluginInstaller(String osName, Map options)
                         IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
                         move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
                     """
-
+ 
                 } else {
                     println "[INFO] The plugin ${options.pluginWinSha}.msi exists in the storage."
                 }

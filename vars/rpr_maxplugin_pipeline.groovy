@@ -6,36 +6,46 @@ def getMaxPluginInstaller(String osName, Map options)
     {
         case 'Windows':
 
-            if (options['isPreBuilt']) {
-                if (options.pluginWinSha) {
-                    win_addon_name = options.pluginWinSha
-                } else {
-                    win_addon_name = "unknown"
-                }
-            } else {
-                win_addon_name = options.productCode
-            }
+            if (options.isPreBuilt) {
+               
+                if (!options.pluginWinSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginWinSha}.msi")) {
 
-            if (!fileExists("${CIS_TOOLS}/../PluginsBinaries/${win_addon_name}.msi")) {
+                    clearBinariesWin()
 
-                clearBinariesWin()
-
-                if (options['isPreBuilt']) {
                     println "[INFO] The plugin does not exist in the storage. Downloading and copying..."
                     downloadPlugin(osName, "Max", options)
-                    win_addon_name = options.pluginWinSha
+
+                        println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
+                        unstash "appWindows"
+                    }
+
+                    bat """
+                        IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
+                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
+                    """
+
                 } else {
-                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
-                    unstash "appWindows"
+                    println "[INFO] The plugin ${options.pluginWinSha}.msi exists in the storage."
                 }
 
-                bat """
-                    IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
-                    move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${win_addon_name}.msi"
-                """
-
             } else {
-                println "[INFO] The plugin ${win_addon_name}.msi exists in the storage."
+
+                if (options.pluginWinSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginWinSha}.msi")) {
+
+                    clearBinariesWin()
+
+                    println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
+                    unstash "appWindows"
+
+                    bat """
+                        IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
+                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
+                    """
+
+                } else {
+                    println "[INFO] The plugin ${options.pluginWinSha}.msi exists in the storage."
+                }
+
             }
 
             break;
@@ -296,14 +306,6 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    if (options['isPreBuilt'])
-    {
-        //plugin is pre built
-        options['executeBuild'] = false
-        options['executeTests'] = true
-        return
-    }
-
     // manual job
     if (options.forceBuild) {
         options.executeBuild = true
@@ -327,71 +329,73 @@ def executePreBuild(Map options)
         }
     }
 
-    dir('RadeonProRenderMaxPlugin')
-    {
-        checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
+    if (!options.isPreBuilt) {
+        dir('RadeonProRenderMaxPlugin')
+        {
+            checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
 
-        options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
-        options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
-        options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-        options.commitShortSHA = options.commitSHA[0..6]
+            options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
+            options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
+            options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+            options.commitShortSHA = options.commitSHA[0..6]
 
-        println "The last commit was written by ${options.commitAuthor}."
-        println "Commit message: ${options.commitMessage}"
-        println "Commit SHA: ${options.commitSHA}"
-        println "Commit shortSHA: ${options.commitShortSHA}"
+            println "The last commit was written by ${options.commitAuthor}."
+            println "Commit message: ${options.commitMessage}"
+            println "Commit SHA: ${options.commitSHA}"
+            println "Commit shortSHA: ${options.commitShortSHA}"
 
-        if (options.projectBranch){
-            currentBuild.description = "<b>Project branch:</b> ${options.projectBranch}<br/>"
-        } else {
-            currentBuild.description = "<b>Project branch:</b> ${env.BRANCH_NAME}<br/>"
-        }
-
-        options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
-
-        if (options['incrementVersion']) {
-            if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
-
-                println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
-                println "[INFO] Current build version: ${options.pluginVersion}"
-
-                def new_version = version_inc(options.pluginVersion, 3)
-                println "[INFO] New build version: ${new_version}"
-                version_write("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR', new_version)
-                
-                options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
-                println "[INFO] Updated build version: ${options.pluginVersion}"
-
-                bat """
-                  git add version.h
-                  git commit -m "buildmaster: version update to ${options.pluginVersion}"
-                  git push origin HEAD:develop
-                """
-
-                //get commit's sha which have to be build
-                options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-                options.projectBranch = options.commitSHA
-                println "[INFO] Project branch hash: ${options.projectBranch}"
+            if (options.projectBranch){
+                currentBuild.description = "<b>Project branch:</b> ${options.projectBranch}<br/>"
+            } else {
+                currentBuild.description = "<b>Project branch:</b> ${env.BRANCH_NAME}<br/>"
             }
-            else
-            {
-                if(options.commitMessage.contains("CIS:BUILD"))
-                {
-                    options['executeBuild'] = true
-                }
 
-                if(options.commitMessage.contains("CIS:TESTS"))
+            options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
+
+            if (options['incrementVersion']) {
+                if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
+
+                    println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
+                    println "[INFO] Current build version: ${options.pluginVersion}"
+
+                    def new_version = version_inc(options.pluginVersion, 3)
+                    println "[INFO] New build version: ${new_version}"
+                    version_write("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR', new_version)
+                    
+                    options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
+                    println "[INFO] Updated build version: ${options.pluginVersion}"
+
+                    bat """
+                      git add version.h
+                      git commit -m "buildmaster: version update to ${options.pluginVersion}"
+                      git push origin HEAD:develop
+                    """
+
+                    //get commit's sha which have to be build
+                    options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+                    options.projectBranch = options.commitSHA
+                    println "[INFO] Project branch hash: ${options.projectBranch}"
+                }
+                else
                 {
-                    options['executeBuild'] = true
-                    options['executeTests'] = true
+                    if(options.commitMessage.contains("CIS:BUILD"))
+                    {
+                        options['executeBuild'] = true
+                    }
+
+                    if(options.commitMessage.contains("CIS:TESTS"))
+                    {
+                        options['executeBuild'] = true
+                        options['executeTests'] = true
+                    }
                 }
             }
-        }
 
-        currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
-        currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
-        currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
-        currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
+            currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
+            currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
+            currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+            currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
+        }
     }
 
     if (env.BRANCH_NAME && (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop")) {
@@ -451,8 +455,6 @@ def executePreBuild(Map options)
         options.groupsRBS = tests
     }
 
-    println(options.groupsRBS)
-
     if(options.splitTestsExecution) {
         options.testsList = options.tests
     }
@@ -471,6 +473,12 @@ def executePreBuild(Map options)
         {
             println(e)
         }
+    }
+
+    if (options['isPreBuilt'])
+    {
+        //plugin is pre built
+        options['executeBuild'] = false
     }
 
 }
