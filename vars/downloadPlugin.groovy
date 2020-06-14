@@ -46,9 +46,7 @@ def call(String osName, String tool, Map options, String credentialsId = '')
                     curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% "${customBuildLink}"
                 """
             } else {
-                sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \\${customBuildLink}\\
-                """
+                sh 'curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% \\"${customBuildLink}\\"'
             }
         }
     }
