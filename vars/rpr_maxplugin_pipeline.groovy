@@ -15,10 +15,6 @@ def getMaxPluginInstaller(String osName, Map options)
                     println "[INFO] The plugin does not exist in the storage. Downloading and copying..."
                     downloadPlugin(osName, "Max", options)
 
-                        println "[INFO] The plugin does not exist in the storage. Unstashing and copying..."
-                        unstash "appWindows"
-                    }
-
                     bat """
                         IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
                         move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
