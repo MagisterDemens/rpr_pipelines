@@ -33,11 +33,11 @@ def call(String osName, String tool, Map options, String credentialsId = '')
                 """
             } else if (osName == "OSX") {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '${options.customBuildLinkOSX}'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkOSX}"
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '${options.customBuildLinkLinux}'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkLinux}"
                 """
             }
         }
@@ -52,11 +52,11 @@ def call(String osName, String tool, Map options, String credentialsId = '')
             } else if (osName == "OSX") {
                 echo options.customBuildLinkOSX
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '${options.customBuildLinkOSX}'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkOSX}"
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '${options.customBuildLinkLinux}'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkLinux}"
                 """
             }
         }
@@ -71,11 +71,11 @@ def call(String osName, String tool, Map options, String credentialsId = '')
                     """
                 } else if (osName == "OSX") {
                     sh """
-                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '"${options.customBuildLinkOSX}"'
+                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkOSX}"
                     """
                 } else {
                     sh """
-                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u %USERNAME%:%PASSWORD% '"${options.customBuildLinkLinux}"'
+                        curl -L -o RadeonProRender${tool}_${osName}.${extentsion} -u $USERNAME:$PASSWORD "${options.customBuildLinkLinux}"
                     """
                 }
             }
@@ -87,11 +87,11 @@ def call(String osName, String tool, Map options, String credentialsId = '')
             } else if (osName == "OSX") {
                 echo options.customBuildLinkOSX
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} '"${options.customBuildLinkOSX}"'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${options.customBuildLinkOSX}"
                 """
             } else {
                 sh """
-                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} '"${options.customBuildLinkLinux}"'
+                    curl -L -o RadeonProRender${tool}_${osName}.${extentsion} "${options.customBuildLinkLinux}"
                 """
             }
         }
