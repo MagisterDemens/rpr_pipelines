@@ -651,7 +651,6 @@ def call(String projectBranch = "",
     Boolean enableNotifications = true,
     Boolean incrementVersion = true,
     Boolean forceBuild = false,
-    Boolean skipBuild = false,
     String tests = "") {
     try {
         String PRJ_NAME="TAN"
@@ -691,7 +690,6 @@ def call(String projectBranch = "",
                                 enableNotifications:enableNotifications,
                                 incrementVersion:incrementVersion,
                                 forceBuild:forceBuild,
-                                skipBuild:skipBuild,
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 buildConfiguration:buildConfiguration,

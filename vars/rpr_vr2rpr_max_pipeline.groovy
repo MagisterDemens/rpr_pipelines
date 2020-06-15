@@ -219,10 +219,10 @@ def executeBuild(String osName, Map options){
 
 def executePreBuild(Map options)
 {
+    options.executeBuild = false
 
     // manual job
     if (options.forceBuild) {
-        options.executeBuild = true
         options.executeTests = true
     // auto job
     } else {
@@ -470,7 +470,6 @@ def call(String customBuildLinkWindows = "https://builds.rpr.cis.luxoft.com/bin_
          Boolean updateRefs = false,
          Boolean enableNotifications = true,
          Boolean incrementVersion = true,
-         Boolean skipBuild = true,
          String testsPackage = "",
          String tests = "",
          String toolVersion = "2019",
@@ -491,7 +490,6 @@ def call(String customBuildLinkWindows = "https://builds.rpr.cis.luxoft.com/bin_
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 incrementVersion:incrementVersion,
-                                skipBuild:skipBuild,
                                 testsPackage:testsPackage,
                                 tests:tests,
                                 toolVersion:toolVersion,

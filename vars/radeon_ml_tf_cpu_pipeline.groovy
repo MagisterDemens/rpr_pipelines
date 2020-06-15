@@ -102,6 +102,9 @@ def executeBuildLinux(Map options)
         cd build
         cmake ${options['cmakeKeys']} -DRML_TENSORFLOW_DIR=${WORKSPACE}/tensorflow_cc .. >> ../../${STAGE_NAME}.log 2>&1
         make -j >> ../../${STAGE_NAME}.log 2>&1
+        """
+     
+        sh """
         make
         mv bin Release
         

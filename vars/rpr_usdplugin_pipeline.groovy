@@ -36,16 +36,14 @@ def executeGenTestRefCommand(String osName, Map options)
 
 def executeTestCommand(String osName, Map options)
 {
-    if (!options['skipBuild'])
-    {
-        // installPlugin(osName, options)
-        try {
-            // buildRenderCache(osName, "${options.stageName}.log")
-            println "no tests functions"
-        } catch(e) {
-            println(e.toString())
-            println("ERROR during building render cache")
-        }
+    
+    // installPlugin(osName, options)
+    try {
+        // buildRenderCache(osName, "${options.stageName}.log")
+        println "no tests functions"
+    } catch(e) {
+        println(e.toString())
+        println("ERROR during building render cache")
     }
 
     switch(osName)
@@ -53,21 +51,23 @@ def executeTestCommand(String osName, Map options)
     case 'Windows':
         dir('scripts')
         {
-            bat """
-            run.bat ${options.renderDevice} ${options.testsPackage} \"${options.tests}\">> ../${options.stageName}.log  2>&1
-            """
+            //bat """
+            //run.bat ${options.renderDevice} ${options.testsPackage} \"${options.tests}\">> ../${options.stageName}.log  2>&1
+            //"""
+            println "no tests functions"
         }
         break;
     case 'OSX':
         dir('scripts')
         {
-            sh """
-            ./run.sh ${options.renderDevice} ${options.testsPackage} \"${options.tests}\" >> ../${options.stageName}.log 2>&1
-            """
+            //sh """
+            //./run.sh ${options.renderDevice} ${options.testsPackage} \"${options.tests}\" >> ../${options.stageName}.log 2>&1
+            //"""
+            println "no tests functions"
         }
         break;
     default:
-        println "not supported"
+        println "no tests functions"
     }
 }
 

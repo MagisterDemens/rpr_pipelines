@@ -226,10 +226,8 @@ def executeTests(String osName, String asicName, Map options)
 
         downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Blender2.8Assets/", 'Blender2.8Assets')
 
-        if (!options['skipBuild']) {
-
+        try {
             try {
-
                 Boolean newPluginInstalled = false
                 timeout(time: "12", unit: 'MINUTES') {
                     getBlenderAddonInstaller(osName, options)
@@ -254,6 +252,13 @@ def executeTests(String osName, String asicName, Map options)
                 installBlenderAddon(osName, "2.83", options, false, true)
                 throw e
             }
+            
+        } catch(e) {
+            println("[ERROR] Failed to install plugin on ${env.NODE_NAME}")
+            println(e.toString())
+            // deinstalling broken addon
+            installBlenderAddon(osName, "2.82", options, false, true)
+            throw e
         }
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
@@ -319,7 +324,7 @@ def executeTests(String osName, String asicName, Map options)
 
                         // deinstalling broken addon & reallocate node if there are still attempts
                         if (sessionReport.summary.total == sessionReport.summary.error + sessionReport.summary.skipped) {
-                            installBlenderAddon(osName, "2.82", options, false, true)
+                            installBlenderAddon(osName, "2.8", options, false, true)
                             if (options.currentTry < options.nodeReallocateTries) {
                                 throw new Exception("All tests crashed")
                             }
@@ -453,6 +458,10 @@ def executeBuild(String osName, Map options)
         if(env.BRANCH_NAME && env.BRANCH_NAME != "master" && env.BRANCH_NAME != "develop")
         {
             options.branch_postfix = env.BRANCH_NAME.replace('/', '-')
+        }
+        if(options.projectBranch && options.projectBranch != "master" && options.projectBranch != "develop")
+        {
+            options.branch_postfix = options.projectBranch.replace('/', '-')
         }
 
         outputEnvironmentInfo(osName)
@@ -736,13 +745,13 @@ def executeDeploy(Map options, List platformList, List testResultList)
                         if (options['isPreBuilt'])
                         {
                             bat """
-                            build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.82')}" "PreBuilt" "PreBuilt" "PreBuilt"
+                            build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.83')}" "PreBuilt" "PreBuilt" "PreBuilt"
                             """
                         }
                         else
                         {
                             bat """
-                            build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.82')}" ${options.commitSHA} ${branchName} \"${escapeCharsByUnicode(options.commitMessage)}\"
+                            build_reports.bat ..\\summaryTestResults "${escapeCharsByUnicode('Blender 2.83')}" ${options.commitSHA} ${branchName} \"${escapeCharsByUnicode(options.commitMessage)}\"
                             """
                         }
                     }
@@ -848,7 +857,6 @@ def call(String projectRepo = "git@github.com:GPUOpen-LibrariesAndSDKs/RadeonPro
     Boolean updateRefs = false,
     Boolean enableNotifications = true,
     Boolean incrementVersion = true,
-    Boolean skipBuild = false,
     String renderDevice = "gpu",
     String testsPackage = "",
     String tests = "",
@@ -938,7 +946,6 @@ def call(String projectRepo = "git@github.com:GPUOpen-LibrariesAndSDKs/RadeonPro
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 incrementVersion:incrementVersion,
-                                skipBuild:skipBuild,
                                 renderDevice:renderDevice,
                                 testsPackage:testsPackage,
                                 tests:tests,

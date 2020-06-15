@@ -72,7 +72,10 @@ def executeBuildOSX(Map options)
     cd build
     cmake ${options['cmakeKeys']} .. >> ../${STAGE_NAME}.Release.log 2>&1
     make -j >> ../${STAGE_NAME}.Release.log 2>&1
-
+    """
+    
+    sh """
+    cd build
     tar cf ${CIS_OS}_Release.tar bin
     """
 

@@ -86,32 +86,30 @@ def executeTests(String osName, String asicName, Map options)
 
         downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/", 'GLTF_export/Maya')
 
-        if (!options['skipBuild']) {
-            try {
-                Boolean newPluginInstalled = false
-                timeout(time: "30", unit: 'MINUTES') {
-                    unstash "app${osName}"
-                    newPluginInstalled = installMSIPlugin(osName, 'Maya', options)
-                    println "[INFO] Install function return ${newPluginInstalled}"
-                }
-                if (newPluginInstalled) {
-                    // Continue working if cache building will failed 
-                    try {
-                        timeout(time: "3", unit: 'MINUTES') {
-                            buildRenderCache(osName)
-                        }
-                    } catch (e) {
-                        println(e.toString())
-                        println("[ERROR] Failed to build cache.")
+        try {
+            Boolean newPluginInstalled = false
+            timeout(time: "30", unit: 'MINUTES') {
+                unstash "app${osName}"
+                newPluginInstalled = installMSIPlugin(osName, 'Maya', options)
+                println "[INFO] Install function return ${newPluginInstalled}"
+            }
+            if (newPluginInstalled) {
+                // Continue working if cache building will failed 
+                try {
+                    timeout(time: "3", unit: 'MINUTES') {
+                        buildRenderCache(osName)
                     }
+                } catch (e) {
+                    println(e.toString())
+                    println("[ERROR] Failed to build cache.")
                 }
             }
-            catch(e) {
-                println(e.toString())
-                println("[ERROR] Failed to install plugin.")
-                currentBuild.result = "FAILED"
-                throw e
-            }
+        }
+        catch(e) {
+            println(e.toString())
+            println("[ERROR] Failed to install plugin.")
+            currentBuild.result = "FAILED"
+            throw e
         }
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
@@ -620,7 +618,6 @@ def call(String projectBranch = "master", String thirdpartyBranch = "master",
          Boolean updateRefs = false,
          Boolean enableNotifications = true,
          Boolean incrementVersion = false,
-         Boolean skipBuild = false,
          String renderDevice = "gpu",
          String testsPackage = "",
          String tests = "",
@@ -657,7 +654,6 @@ def call(String projectBranch = "master", String thirdpartyBranch = "master",
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 incrementVersion:incrementVersion,
-                                skipBuild:skipBuild,
                                 renderDevice:renderDevice,
                                 testsPackage:testsPackage,
                                 tests:tests,

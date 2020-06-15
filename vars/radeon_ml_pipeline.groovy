@@ -147,7 +147,10 @@ def executeBuildWindows(Map options)
         cmake ${cmakeKeysWin} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow_cc -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ..\\${STAGE_NAME}.log 2>&1
         set msbuild=\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\MSBuild\\15.0\\Bin\\MSBuild.exe\"
         %msbuild% RadeonML.sln -property:Configuration=Release >> ..\\${STAGE_NAME}.log 2>&1
-
+    """
+    
+    bat """
+        cd build
         xcopy ..\\third_party\\miopen\\MIOpen.dll .\\Release\\MIOpen.dll*
         xcopy ..\\third_party\\tensorflow_cc\\windows\\* .\\Release
         mkdir .\\Release\\rml
@@ -167,7 +170,10 @@ def executeBuildOSX(Map options)
         cd build
         cmake ${cmakeKeysOSX} .. >> ../${STAGE_NAME}.log 2>&1
         make -j >> ../${STAGE_NAME}.log 2>&1
-
+    """
+    
+    sh """
+        cd build
         mv bin Release
         mkdir ./Release/rml
         mkdir ./Release/rml/rml
@@ -198,6 +204,10 @@ def executeBuildLinux(Map options)
         cd build
         cmake ${cmakeKeysLinux[CIS_OS]} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow_cc -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ../${STAGE_NAME}.log 2>&1
         make -j >> ../${STAGE_NAME}.log 2>&1
+    """
+
+    sh """
+        cd build
         mv bin Release
         cp ../third_party/miopen/libMIOpen.so* ./Release
         cp ../third_party/tensorflow_cc/linux/* ./Release
@@ -321,7 +331,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
 def call(String projectBranch = "",
          String testsBranch = "master",
          String assestsBranch = "master",
-         String platforms = 'Windows:AMD_RadeonVII,NVIDIA_RTX2080;Ubuntu18:AMD_RadeonVII,NVIDIA_GTX980;CentOS7_6;OSX',
+         String platforms = 'Windows:AMD_RadeonVII,NVIDIA_RTX2080;Ubuntu18:AMD_RadeonVII,NVIDIA_GTX980;CentOS7_6;OSX:AMD_RXVEGA',
          String projectRepo='git@github.com:Radeon-Pro/RadeonML.git',
          Boolean enableNotifications = true,
          Boolean executeFT = true)
