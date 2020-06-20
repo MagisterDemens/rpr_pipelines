@@ -27,7 +27,7 @@ def getBlenderAddonInstaller(String osName, Map options)
 
             } else {
 
-                if (options.pluginWinSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginWinSha}.zip")) {
+                if (options.commitSHA && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.commitSHA}_${osName}.zip")) {
 
                     clearBinariesWin()
 
@@ -36,11 +36,11 @@ def getBlenderAddonInstaller(String osName, Map options)
 
                     bat """
                         IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
-                        move RadeonProRender*.zip "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.zip"
+                        move RadeonProRender*.zip "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.commitSHA}_${osName}.zip"
                     """
 
                 } else {
-                    println "[INFO] The plugin ${options.pluginWinSha}.zip exists in the storage."
+                    println "[INFO] The plugin ${options.commitSHA}_${osName}.zip exists in the storage."
                 }
 
             }
