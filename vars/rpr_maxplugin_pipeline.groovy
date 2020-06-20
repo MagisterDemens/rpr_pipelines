@@ -26,7 +26,7 @@ def getMaxPluginInstaller(String osName, Map options)
 
             } else {
 
-                if (options.pluginWinSha && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.pluginWinSha}.msi")) {
+                if (options.productCode && !fileExists("${CIS_TOOLS}/../PluginsBinaries/${options.productCode}.msi")) {
 
                     clearBinariesWin()
 
@@ -35,11 +35,11 @@ def getMaxPluginInstaller(String osName, Map options)
 
                     bat """
                         IF NOT EXIST "${CIS_TOOLS}\\..\\PluginsBinaries" mkdir "${CIS_TOOLS}\\..\\PluginsBinaries"
-                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.pluginWinSha}.msi"
+                        move RadeonProRender*.msi "${CIS_TOOLS}\\..\\PluginsBinaries\\${options.productCode}.msi"
                     """
 
                 } else {
-                    println "[INFO] The plugin ${options.pluginWinSha}.msi exists in the storage."
+                    println "[INFO] The plugin ${options.productCode}.msi exists in the storage."
                 }
 
             }
