@@ -4,6 +4,7 @@ import hudson.plugins.git.GitException;
 import java.nio.channels.ClosedChannelException;
 import hudson.remoting.RequestAbortedException;
 import java.lang.IllegalArgumentException;
+import java.time.*;
 
 
 def executeTestsNode(String osName, String gpuNames, def executeTests, Map options)
@@ -31,7 +32,7 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                         def nodesCount = nodesList.size()
                         options.nodeReallocateTries = nodesCount + 1
                         boolean successCurrentNode = false
-                        
+
                         for (int i = 0; i < options.nodeReallocateTries; i++)
                         {
                             node(nodeLabels)
@@ -57,11 +58,37 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                                             println "Exception cause: ${e.getCause()}"
                                             println "Exception stack trace: ${e.getStackTrace()}"
 
-                                            // Abort PRs
-                                            //if (options.containsKey("isPR") &&  options.isPR == true) {
-                                            //    println "[INFO] This build was aborted due to new PR was appeared."
-                                            //    i = options.nodeReallocateTries + 1
-                                            //}
+                                            String exceptionClassName = e.getClass().toString()
+                                            if (exceptionClassName.contains("FlowInterruptedException")) {
+                                                e.getCauses().each(){
+                                                    // UserInterruption aborting by user
+                                                    // ExceededTimeout aborting by timeout
+                                                    // CancelledCause for aborting by new commit
+                                                    String causeClassName = it.getClass().toString()
+                                                    println "Interruption cause: ${causeClassName}"
+                                                    if (causeClassName.contains("CancelledCause")) {
+                                                        println "GOT NEW COMMIT"
+                                                        throw e
+                                                    }
+                                                }
+                                            }
+
+                                            // add info about retry to options
+                                            boolean added = false;
+                                            String testsOrTestPackage = newOptions['tests'];
+                                            if (testsOrTestPackage == ''){
+                                                testsOrTestPackage = newOptions['testsPackage'].replace(' ', '_')
+                                            }
+                                            options['nodeRetry'].each{ retry ->
+                                                if (retry['Testers'].equals(nodesList)){
+                                                    retry['Tries'][testsOrTestPackage].add([host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().toString()])
+                                                    added = true
+                                                }
+                                            }
+                                            if (!added){
+                                                options['nodeRetry'].add([Testers: nodesList, Tries: [["${testsOrTestPackage}": [[host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().toString()]]]]])
+                                            }
+                                            println options['nodeRetry'].inspect()
 
                                             // change PC after first failed tries and don't change in the last try
                                             if (i < nodesCount - 1 && nodesCount != 1) {
@@ -113,7 +140,13 @@ def executePlatform(String osName, String gpuNames, def executeBuild, def execut
                     }
                 }
             }
-            executeTestsNode(osName, gpuNames, executeTests, options)
+            if (options.containsKey('tests') && options.containsKey('testsPackage')){
+                if (options['testsPackage'] != 'none' || options['tests'].size() == 0 || !(options['tests'].size() == 1 && options['tests'].get(0).length() == 0)){ // BUG: can throw exception if options['tests'] is string with length 1
+                    executeTestsNode(osName, gpuNames, executeTests, options)
+                }
+            } else {
+                executeTestsNode(osName, gpuNames, executeTests, options)
+            }
         }
         catch (e)
         {
@@ -241,11 +274,23 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                 }
                 parallel tasks
             }
-            catch (e) 
+            catch (e)
             {
                 println(e.toString());
                 println(e.getMessage());
                 currentBuild.result = "FAILURE"
+                String exceptionClassName = e.getClass().toString()
+                if (exceptionClassName.contains("FlowInterruptedException")) {
+                    e.getCauses().each(){
+                        // UserInterruption aborting by user
+                        // ExceededTimeout aborting by timeout
+                        // CancelledCause for aborting by new commit
+                        String causeClassName = it.getClass().toString()
+                        if (causeClassName.contains("CancelledCause")) {
+                            executeDeploy = null
+                        }
+                    }
+                }
             }
             finally
             {
@@ -261,7 +306,13 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                                 {
                                     if(executeDeploy && options['executeTests'])
                                     {
-                                        executeDeploy(options, platformList, testResultList)
+                                        if (options.containsKey('tests') && options.containsKey('testsPackage')){
+                                            if (options['testsPackage'] != 'none' || options['tests'].size() == 0 || !(options['tests'].size() == 1 && options['tests'].get(0).length() == 0)){
+                                                executeDeploy(options, platformList, testResultList)
+                                            }
+                                        } else {
+                                            executeDeploy(options, platformList, testResultList)
+                                        }
                                     }
                                 }
                                 catch (e) {

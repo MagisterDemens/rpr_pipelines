@@ -73,12 +73,14 @@ def executeBuildWindows(Map options)
         dir("rml-deploy") {
             checkOutBranchOrScm("master", "ssh://git@gitlab.cts.luxoft.com:30122/servants/rml-deploy.git", true, false, true, "radeonprorender-gitlab")
             bat """
-                MD directml\\${CIS_OS}
+                MD "directml\\${CIS_OS}"
+                RMDIR /S/Q "directml\\${CIS_OS}"
+                MD "directml\\${CIS_OS}"
                 xcopy ..\\build-direct\\Release "directml\\${CIS_OS}" /s/y/i
                 git config --local user.name "radeonbuildmaster"
                 git config --local user.email "radeonprorender.buildmaster@gmail.com"
                 git add --all
-                git commit -m "${CIS_OS} release v${env.TAG_NAME}"
+                git commit -m "${CIS_OS} release ${env.TAG_NAME}"
                 git push origin HEAD:master
             """
         }
@@ -185,8 +187,8 @@ def executeBuild(String osName, Map options)
         }
 
         archiveArtifacts "${STAGE_NAME}.*.log"
-        zip archive: true, dir: 'build-direct/Release', glob: 'RadeonML-DirectML.*, *.exe', zipFile: "${osName}_Release.zip"
-        zip archive: true, dir: 'build-direct-debug/Debug', glob: 'RadeonML-DirectML-d.*, *.exe', zipFile: "${osName}_Debug.zip"
+        zip archive: true, dir: 'build-direct/Release', glob: '', zipFile: "${osName}_Release.zip"
+        zip archive: true, dir: 'build-direct-debug/Debug', glob: '', zipFile: "${osName}_Debug.zip"
     }
 }
 

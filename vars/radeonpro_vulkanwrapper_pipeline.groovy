@@ -80,7 +80,7 @@ def executeBuildWindows(Map options)
                 xcopy external\\glslang\\OGLCompilersDLL\\Release\\OGLCompiler.lib publish-archive-norrn\\lib\\OGLCompiler.lib*
                 xcopy external\\glslang\\SPIRV\\Release\\SPIRV.lib publish-archive-norrn\\lib\\SPIRV.lib*
                 xcopy external\\glslang\\SPIRV\\Release\\SPVRemapper.lib publish-archive-norrn\\lib\\SPVRemapper.lib*
-                xcopy external\\spirv_tools\\Release\\SpirvTools.lib publish-archive-norrn\\lib\\SpirvTools.lib*
+                xcopy external\\spirv-cross\\Release\\SpirvCross.lib publish-archive-norrn\\lib\\SpirvCross.lib*
                 xcopy external\\glslang\\glslang\\OSDependent\\Windows\\Release\\OSDependent.lib publish-archive-norrn\\lib\\OSDependent.lib*
                 """
 
@@ -93,7 +93,7 @@ def executeBuildWindows(Map options)
                 xcopy external\\glslang\\OGLCompilersDLL\\Debug\\OGLCompilerd.lib publish-archive-norrn\\libd\\OGLCompilerd.lib*
                 xcopy external\\glslang\\SPIRV\\Debug\\SPIRVd.lib publish-archive-norrn\\libd\\SPIRVd.lib*
                 xcopy external\\glslang\\SPIRV\\Debug\\SPVRemapperd.lib publish-archive-norrn\\libd\\SPVRemapperd.lib*
-                xcopy external\\spirv_tools\\Debug\\SpirvToolsd.lib publish-archive-norrn\\libd\\SpirvToolsd.lib*
+                xcopy external\\spirv-cross\\Debug\\SpirvCrossd.lib publish-archive-norrn\\libd\\SpirvCrossd.lib*
                 xcopy external\\glslang\\glslang\\OSDependent\\Windows\\Debug\\OSDependentd.lib publish-archive-norrn\\libd\\OSDependentd.lib*
                 """
 
@@ -156,7 +156,7 @@ def executeBuildLinux(Map options, String osName="linux")
         cp external/glslang/OGLCompilersDLL/libOGLCompiler.a publish-archive-norrn/lib/libOGLCompiler.a
         cp external/glslang/SPIRV/libSPIRV.a publish-archive-norrn/lib/libSPIRV.a
         cp external/glslang/SPIRV/libSPVRemapper.a publish-archive-norrn/lib/libSPVRemapper.a
-        cp external/spirv_tools/libSpirvTools.a publish-archive-norrn/lib/libSpirvTools.a
+        cp external/spirv-cross/libSpirvCross.a publish-archive-norrn/lib/libSpirvCross.a
         cp external/glslang/glslang/OSDependent/Unix/libOSDependent.a publish-archive-norrn/lib/libOSDependent.a
         """
 

@@ -39,6 +39,7 @@ def executeCheckout(String branchName, String repoName, Boolean disableSubmodule
             [$class: 'CleanCheckout', deleteUntrackedNestedRepositories: true],
             [$class: 'CheckoutOption', timeout: 30],
             [$class: 'AuthorInChangelog'],
+            [$class: 'CloneOption', timeout: 60, noTags: false],
             [$class: 'SubmoduleOption', disableSubmodules: disableSubmodules,
              parentCredentials: true, recursiveSubmodules: true, shallow: true, depth: 2,
              timeout: 60, reference: '', trackingSubmodules: false]
@@ -54,8 +55,6 @@ def executeCheckout(String branchName, String repoName, Boolean disableSubmodule
         checkout scm
 
     } else {
-        checkoutExtensions.add([$class: 'CloneOption', timeout: 60, shallow: true, depth: 2, noTags: false])
-
         checkout changelog: changelog, poll: polling,
             scm: [$class: 'GitSCM', branches: repoBranch, doGenerateSubmoduleConfigurations: false,
                     extensions: checkoutExtensions,
