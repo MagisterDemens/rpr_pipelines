@@ -490,7 +490,7 @@ def call(String customBuildLinkWindows = "https://builds.rpr.cis.luxoft.com/bin_
                                 forceBuild:forceBuild,
                                 reportName:'Test_20Report',
                                 TESTER_TAG:"ArnoldMaya",
-                                TEST_TIMEOUT:120])
+                                TEST_TIMEOUT:300])
     }
     catch(e) {
         currentBuild.result = "FAILED"
