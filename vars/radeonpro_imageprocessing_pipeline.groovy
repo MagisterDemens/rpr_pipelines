@@ -332,7 +332,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
         }
 
         dir("rif-report") {
-            checkOutBranchOrScm("master", "git@github.com:luxteam/rif_report.git")
+            checkOutBranchOrScm("inemankov/fix_duration", "git@github.com:luxteam/rif_report.git")
 
             bat """
             set PATH=c:\\python35\\;c:\\python35\\scripts\\;%PATH%
