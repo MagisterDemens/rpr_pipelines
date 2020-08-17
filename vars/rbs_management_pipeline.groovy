@@ -46,14 +46,6 @@ def main(Map options) {
 				ssh ${options.user}@${options.frontendIp} ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/docker-management/build_pipeline.sh ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/${dockerComposeFile}
 				ssh ${options.user}@${options.frontendIp} ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/docker-management/up_pipeline.sh ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/${dockerComposeFile}
 			"""
-
-			// run tests
-			if (version=="develop") {
-    		    sh """
-			        ssh ${options.user}@${options.frontendIp} 'chmod +x ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/docker-management/run_tests.sh'
-				    ssh ${options.user}@${options.frontendIp} ${options.RBSServicesRoot}/${version}/universe${versionPostfix}/docker-management/run_tests.sh	    
-    			"""    
-		    }
 		}
 	}
 }
