@@ -8,6 +8,68 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 
+def createTestsThreads(Iterator testsIterator, Map options) {
+    Integer launchingGroupsNumber = 1
+    if (!options['parallelExecutionType'] || options['parallelExecutionType'] == 'TakeOneNodePerGroup') {
+        launchingGroupsNumber = 1
+    } else if (options['parallelExecutionType'] == 'TakeAllFreeNodes') {
+        // TODO calculate number of free nodes
+    } else if (options['parallelExecutionType'] == 'TakeAllOnlineNodes') {
+        launchingGroupsNumber = nodesByLabel label: nodeLabels, offline: false
+    }
+    def testGroups = [:]
+    for (int i = 0; i < launchingGroupsNumber; i++) {
+        // TODO create parallel for execute test groups
+    }
+    parallel testGroups
+    options.testsList.each() { testName ->
+        println("Scheduling ${osName}:${asicName} ${testName}")
+
+        Map newOptions = options.clone()
+        newOptions['testResultsName'] = testName ? "testResult-${asicName}-${osName}-${testName}" : "testResult-${asicName}-${osName}"
+        newOptions['stageName'] = testName ? "${asicName}-${osName}-${testName}" : "${asicName}-${osName}"
+        newOptions['tests'] = testName ? testName : options.tests
+
+        def testerTag = "Tester"
+        if (options.TESTER_TAG){
+            if (options.TESTER_TAG.indexOf(' ') > -1){
+                testerTag = options.TESTER_TAG
+            }else {
+                testerTag = "${options.TESTER_TAG} && Tester"
+            }
+        }
+        def testerLabels = "${osName} && ${testerTag} && OpenCL && gpu${asicName}"
+
+        def retringFunction = { nodesList ->
+            try {
+                executeTests(osName, asicName, newOptions)
+            } catch(Exception e) {
+                // add info about retry to options
+                boolean added = false;
+                String testsOrTestPackage = newOptions['tests'];
+                if (testsOrTestPackage == ''){
+                    testsOrTestPackage = newOptions['testsPackage'].replace(' ', '_')
+                }
+                options['nodeRetry'].each{ retry ->
+                    if (retry['Testers'].equals(nodesList)){
+                        retry['Tries'][testsOrTestPackage].add([host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))])
+                        added = true
+                    }
+                }
+                if (!added){
+                    options['nodeRetry'].add([Testers: nodesList, Tries: [["${testsOrTestPackage}": [[host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))]]]]])
+                }
+                println options['nodeRetry'].inspect()
+
+                throw e
+            }
+        }
+
+        run_with_retries(testerLabels, options.TEST_TIMEOUT, retringFunction, true, "Test", newOptions)
+    }
+}
+
+
 def executeTestsNode(String osName, String gpuNames, def executeTests, Map options)
 {
     if(gpuNames && options['executeTests'])
@@ -22,52 +84,8 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                     // TODO: replace testsList check to splitExecution var
                     options.testsList = options.testsList ?: ['']
 
-                    options.testsList.each() { testName ->
-                        println("Scheduling ${osName}:${asicName} ${testName}")
-
-                        Map newOptions = options.clone()
-                        newOptions['testResultsName'] = testName ? "testResult-${asicName}-${osName}-${testName}" : "testResult-${asicName}-${osName}"
-                        newOptions['stageName'] = testName ? "${asicName}-${osName}-${testName}" : "${asicName}-${osName}"
-                        newOptions['tests'] = testName ? testName : options.tests
-
-                        def testerTag = "Tester"
-                        if (options.TESTER_TAG){
-                            if (options.TESTER_TAG.indexOf(' ') > -1){
-                                testerTag = options.TESTER_TAG
-                            }else {
-                                testerTag = "${options.TESTER_TAG} && Tester"
-                            }
-                        }
-                        def testerLabels = "${osName} && ${testerTag} && OpenCL && gpu${asicName}"
-
-                        def retringFunction = { nodesList ->
-                            try {
-                                executeTests(osName, asicName, newOptions)
-                            } catch(Exception e) {
-                                // add info about retry to options
-                                boolean added = false;
-                                String testsOrTestPackage = newOptions['tests'];
-                                if (testsOrTestPackage == ''){
-                                    testsOrTestPackage = newOptions['testsPackage'].replace(' ', '_')
-                                }
-                                options['nodeRetry'].each{ retry ->
-                                    if (retry['Testers'].equals(nodesList)){
-                                        retry['Tries'][testsOrTestPackage].add([host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))])
-                                        added = true
-                                    }
-                                }
-                                if (!added){
-                                    options['nodeRetry'].add([Testers: nodesList, Tries: [["${testsOrTestPackage}": [[host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))]]]]])
-                                }
-                                println options['nodeRetry'].inspect()
-
-                                throw e
-                            }
-                        }
-
-                        run_with_retries(testerLabels, options.TEST_TIMEOUT, retringFunction, true, "Test", newOptions)
-                    }
-
+                    // TODO add here call of tests function
+                    Iterator testsIterator = options.testsList.iterator()
                 }
             }
         }
