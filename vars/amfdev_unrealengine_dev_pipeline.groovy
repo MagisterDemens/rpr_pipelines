@@ -1,0 +1,107 @@
+def executeTests(String osName, String asicName, Map options)
+{
+    // TODO: implement tests stage
+}
+
+def executeBuildWindows(Map options)
+{
+    dir('U/integration')
+    {
+        bat """
+            Build.bat ${options.targets.joins(' ')} ${options.version} ${options.renderType} ${options.configuration} ${options.testsVariants.joins(' ')} ${options.testsName} ${options.visualStudioVersion} >> ..\\..\\${STAGE_NAME}.log 2>&1
+        """
+    }
+}
+
+def executeBuild(String osName, Map options)
+{
+    try {        
+        cleanWS(osName)
+        dir('U')
+        {
+            checkOutBranchOrScm(options['projectBranch'], 'git@github.com:amfdev/UnrealEngine_dev.git')
+        }
+        
+        outputEnvironmentInfo(osName)
+
+        switch(osName)
+        {
+        case 'Windows': 
+            executeBuildWindows(options); 
+            break;
+        case 'OSX':
+            echo "[WARNING] OSX is not supported"
+            break;
+        default: 
+            echo "[WARNING] ${osName} is not supported"
+        }
+    }
+    catch (e) {
+        throw e
+    }
+    finally {
+        archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
+        archiveArtifacts "UnrealEngine_dev/integration/Logs/**/*.*"
+    }                        
+}
+
+def executePreBuild(Map options)
+{
+    currentBuild.description = ""
+    ['projectBranch'].each
+    {
+        if(options[it] != 'master' && options[it] != "")
+        {
+            currentBuild.description += "<b>${it}:</b> ${options[it]}<br/>"
+        }
+    }
+}
+
+def executeDeploy(Map options, List platformList, List testResultList)
+{
+    // TODO: implement deploy stage
+}
+
+
+def call(String projectBranch = "",
+         String platforms = 'Windows',
+         String targets = '',
+         String version = '',
+         String renderType = '',
+         String configuration = '',
+         String testsVariants = '',
+         String testsName = '',
+         String visualStudioVersion = '',
+         Boolean enableNotifications = false) {
+    try
+    {
+        String PRJ_NAME="UE"
+        String PRJ_ROOT="gpuopen"
+
+        targets = targets.split(',')
+        testsVariants = testsVariants.split(',')
+
+        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
+                               [projectBranch:projectBranch,
+                                targets:targets,
+                                version:version,
+                                renderType:renderType,
+                                configuration:configuration,
+                                testsVariants:testsVariants,
+                                testsName:testsName,
+                                visualStudioVersion:visualStudioVersion,
+                                enableNotifications:enableNotifications,
+                                PRJ_NAME:PRJ_NAME,
+                                PRJ_ROOT:PRJ_ROOT,
+                                BUILDER_TAG:'BuilderU',
+                                BUILD_TIMEOUT:240,
+                                executeBuild:true,
+                                executeTests:false])
+    }
+    catch(e) {
+        currentBuild.result = "FAILED"
+        println(e.toString());
+        println(e.getMessage());
+        throw e
+    }
+}
