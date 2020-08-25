@@ -8,7 +8,7 @@ def executeBuildWindows(Map options)
     dir('U\\integration')
     {
         bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.configuration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} >> ..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} >> ..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
@@ -67,7 +67,7 @@ def call(String projectBranch = "",
          String targets = '',
          String version = '',
          String renderType = '',
-         String configuration = '',
+         String engineConfiguration = '',
          String testsVariants = '',
          String testsName = '',
          String visualStudioVersion = '',
@@ -86,7 +86,7 @@ def call(String projectBranch = "",
                                 targets:targets,
                                 version:version,
                                 renderType:renderType,
-                                configuration:configuration,
+                                engineConfiguration:engineConfiguration,
                                 testsVariants:testsVariants,
                                 testsName:testsName,
                                 visualStudioVersion:visualStudioVersion,
