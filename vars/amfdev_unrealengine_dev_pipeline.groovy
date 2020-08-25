@@ -8,7 +8,7 @@ def executeBuildWindows(Map options)
     dir('U\\integration')
     {
         bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} >> ..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
@@ -39,7 +39,7 @@ def executeBuild(String osName, Map options)
         throw e
     }
     finally {
-        archiveArtifacts artifacts: "U/*.log", allowEmptyArchive: true
+        archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
         archiveArtifacts "U/integration/Logs/**/*.*"
     }                        
 }
