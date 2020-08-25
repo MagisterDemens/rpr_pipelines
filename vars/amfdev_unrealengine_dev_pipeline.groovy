@@ -16,7 +16,6 @@ def executeBuildWindows(Map options)
 def executeBuild(String osName, Map options)
 {
     try {        
-        cleanWS(osName)
         dir('U')
         {
             checkOutBranchOrScm(options['projectBranch'], 'git@github.com:amfdev/UnrealEngine_dev.git')
