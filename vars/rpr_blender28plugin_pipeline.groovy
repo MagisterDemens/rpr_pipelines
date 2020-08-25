@@ -328,6 +328,9 @@ def executeTests(String osName, String asicName, Map options)
             // TODO: receivebaseline for json suite
             try {
                 String middle_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_blender_autotests_baselines" : "/mnt/c/TestResources/rpr_blender_autotests_baselines"
+                if (options.engine == 'FULL2'){
+                    middle_dir="${middle_dir}-NorthStar"
+                }
                 println "[INFO] Downloading reference images for ${options.tests}"
                 options.tests.split(" ").each() {
                     receiveFiles("${REF_PATH_PROFILE}/${it}", middle_dir)
