@@ -5,10 +5,10 @@ def executeTests(String osName, String asicName, Map options)
 
 def executeBuildWindows(Map options)
 {
-    dir('U/integration')
+    dir('U\\integration')
     {
         bat """
-            Build.bat ${options.targets.joins(' ')} ${options.version} ${options.renderType} ${options.configuration} ${options.testsVariants.joins(' ')} ${options.testsName} ${options.visualStudioVersion} >> ..\\..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.configuration} ${options.testsVariants.join(' ')} ${options.testsName} ${options.visualStudioVersion} >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
@@ -41,7 +41,7 @@ def executeBuild(String osName, Map options)
     }
     finally {
         archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
-        archiveArtifacts "UnrealEngine_dev/integration/Logs/**/*.*"
+        archiveArtifacts "U/integration/Logs/**/*.*"
     }                        
 }
 
