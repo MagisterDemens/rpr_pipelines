@@ -9,7 +9,7 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
     if (!fileExists(targetFolderPath) || forceDownloadUE) {
         println("[INFO] UnrealEngine will be downloaded and configured")
         bat """
-            Build.bat Engine ${version} PrepareUE Development
+            Build.bat Engine ${version} PrepareUE Development >> ..\\..\\PrepareUE.${STAGE_NAME}.log 2>&1
         """
 
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
