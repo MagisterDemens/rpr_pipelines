@@ -8,7 +8,7 @@ def executeBuildWindows(Map options)
     dir('U\\integration')
     {
         bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.additionalOptions.join(' ')} >> ..\\..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.pluginType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.source} >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
@@ -66,12 +66,13 @@ def call(String projectBranch = "",
          String platforms = 'Windows',
          String targets = '',
          String version = '',
-         String renderType = '',
+         String pluginType = '',
          String engineConfiguration = '',
          String testsVariants = '',
          String testsName = '',
          String visualStudioVersion = '',
-         String additionalOptions = '',
+         String graphicsAPI = '',
+         String pluginRepository,
          Boolean enableNotifications = false) {
     try
     {
@@ -81,18 +82,33 @@ def call(String projectBranch = "",
         targets = targets.split(',')
         testsVariants = testsVariants.split(',')
         testsName = testsName.split(',')
-        additionalOptions = additionalOptions.split(',')
+        graphicsAPI = graphicsAPI.split(',')
+        for (int i = 0; i < graphicsAPI.length; i++) {
+            // DX11 is selected if 'Vulkan' value isn't specified. There isn't special key for DX11
+            if (graphicsAPI[i].contains("DX11")) {
+                graphicsAPI[i] = " "
+                break
+            }
+        }
+
+        String source = ""
+        if (pluginRepository.contains("amfdev")) {
+            source = "Clone"
+        } else if (pluginRepository.contains("GPUOpen")) {
+            source = "Origin"
+        }
 
         multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
                                [projectBranch:projectBranch,
                                 targets:targets,
                                 version:version,
-                                renderType:renderType,
+                                pluginType:pluginType,
                                 engineConfiguration:engineConfiguration,
                                 testsVariants:testsVariants,
                                 testsName:testsName,
                                 visualStudioVersion:visualStudioVersion,
-                                additionalOptions:additionalOptions,
+                                graphicsAPI:graphicsAPI,
+                                source:source,
                                 enableNotifications:enableNotifications,
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
