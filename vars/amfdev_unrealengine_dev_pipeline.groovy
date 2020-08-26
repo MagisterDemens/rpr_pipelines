@@ -32,7 +32,7 @@ def executeBuildWindows(Map options)
     {
         getPreparedUE(options['version'], options['pluginType'], options['forceDownloadUE'])
         bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.pluginType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.source} >> ..\\..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.pluginType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.source} Dirty >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
