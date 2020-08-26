@@ -3,10 +3,34 @@ def executeTests(String osName, String asicName, Map options)
     // TODO: implement tests stage
 }
 
+def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
+    String targetFolderPath = "${CIS_TOOLS}\\..\\PreparedUE\\UE-${version}"
+    String folderName = pluginType == "Standard" ? "UE-${version}" : "UE-${version}-${pluginType}"
+    if (!fileExists(targetFolderPath) || forceDownloadUE) {
+        println("[INFO] UnrealEngine will be downloaded and configured")
+        bat """
+            Build.bat Engine ${version} PrepareUE Development
+        """
+
+        println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
+        bat """
+            xcopy /s/y/i ${folderName} ${targetFolderPath}
+        """
+    } else {
+        println("[INFO] Prepared UnrealEngine found. Copying it...")
+        dir(folderName) {
+            bat """
+                xcopy /s/y/i ${targetFolderPath} .
+            """
+        }
+    }
+}
+
 def executeBuildWindows(Map options)
 {
     dir('U\\integration')
     {
+        getPreparedUE(options['version'], options['pluginType'], options['forceDownloadUE'])
         bat """
             Build.bat ${options.targets.join(' ')} ${options.version} ${options.pluginType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.source} >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
@@ -29,10 +53,10 @@ def executeBuild(String osName, Map options)
             executeBuildWindows(options); 
             break;
         case 'OSX':
-            echo "[WARNING] OSX is not supported"
+            println("[WARNING] OSX is not supported")
             break;
         default: 
-            echo "[WARNING] ${osName} is not supported"
+            println("[WARNING] ${osName} is not supported")
         }
     }
     catch (e) {
@@ -72,7 +96,8 @@ def call(String projectBranch = "",
          String testsName = '',
          String visualStudioVersion = '',
          String graphicsAPI = '',
-         String pluginRepository,
+         String pluginRepository = '',
+         Boolean forceDownloadUE = false,
          Boolean enableNotifications = false) {
     try
     {
@@ -109,6 +134,7 @@ def call(String projectBranch = "",
                                 visualStudioVersion:visualStudioVersion,
                                 graphicsAPI:graphicsAPI,
                                 source:source,
+                                forceDownloadUE:forceDownloadUE,
                                 enableNotifications:enableNotifications,
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
