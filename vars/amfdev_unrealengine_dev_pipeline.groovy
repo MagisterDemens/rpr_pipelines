@@ -14,13 +14,13 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
 
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
         bat """
-            xcopy /s/y/i UE-${version} ${targetFolderPath}
+            xcopy /s/y/i UE-${version} ${targetFolderPath} >> nul
         """
     } else {
         println("[INFO] Prepared UnrealEngine found. Copying it...")
         dir(folderName) {
             bat """
-                xcopy /s/y/i ${targetFolderPath} .
+                xcopy /s/y/i ${targetFolderPath} . >> nul
             """
         }
     }
