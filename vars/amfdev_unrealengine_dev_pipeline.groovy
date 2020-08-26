@@ -18,7 +18,7 @@ def executeBuild(String osName, Map options)
     try {        
         dir('U')
         {
-            checkOutBranchOrScm(options['projectBranch'], 'git@github.com:amfdev/UnrealEngine_dev.git')
+            checkOutBranchOrScm(options['projectBranch'], 'git@github.com:luxteam/UnrealEngine_dev.git')
         }
         
         outputEnvironmentInfo(osName)
