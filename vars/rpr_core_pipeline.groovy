@@ -88,15 +88,6 @@ def getCoreSDK(String osName, Map options)
 
 def executeGenTestRefCommand(String osName, Map options)
 {
-    try
-    {
-        //for update existing manifest file
-        receiveFiles("${options.REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
-    }
-    catch(e)
-    {
-        println("baseline_manifest.json not found")
-    }
 
     dir('scripts')
     {
@@ -221,11 +212,12 @@ def executeTests(String osName, String asicName, Map options)
         else
         {
             try {
+                println "[INFO] Downloading reference images for ${options.tests}"
                 options.tests.split(" ").each() {
                     receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
                 }
-            } catch(e) {
-                println("No baseline")
+            } catch (e) {
+                println("[WARNING] Baseline doesn't exist.")
             }
             executeTestCommand(osName, asicName, options)
         }
