@@ -8,7 +8,7 @@ def executeBuildWindows(Map options)
     dir('U\\integration')
     {
         bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} >> ..\\..\\${STAGE_NAME}.log 2>&1
+            Build.bat ${options.targets.join(' ')} ${options.version} ${options.renderType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.additionalOptions.join(' ')} >> ..\\..\\${STAGE_NAME}.log 2>&1
         """
     }
 }
@@ -71,6 +71,7 @@ def call(String projectBranch = "",
          String testsVariants = '',
          String testsName = '',
          String visualStudioVersion = '',
+         String additionalOptions = '',
          Boolean enableNotifications = false) {
     try
     {
@@ -80,6 +81,7 @@ def call(String projectBranch = "",
         targets = targets.split(',')
         testsVariants = testsVariants.split(',')
         testsName = testsName.split(',')
+        additionalOptions = additionalOptions.split(',')
 
         multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
                                [projectBranch:projectBranch,
@@ -90,6 +92,7 @@ def call(String projectBranch = "",
                                 testsVariants:testsVariants,
                                 testsName:testsName,
                                 visualStudioVersion:visualStudioVersion,
+                                additionalOptions:additionalOptions,
                                 enableNotifications:enableNotifications,
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
