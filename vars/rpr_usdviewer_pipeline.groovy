@@ -8,7 +8,7 @@ def executeBuildWindows(Map options)
 
         // vcvars64.bat sets VS/msbuild env
         bat """
-            call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat" >> ${STAGE_NAME}.vcvar.log 2>&1
+            call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat" >> ${STAGE_NAME}.EnvVariables.log 2>&1
         """
 
         // VulkanWrappers
