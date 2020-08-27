@@ -15,6 +15,8 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
         bat """
             xcopy /s/y/i UE-${version} ${targetFolderPath} >> nul
+
+            rename UE-${version} ${folderName}
         """
     } else {
         println("[INFO] Prepared UnrealEngine found. Copying it...")
