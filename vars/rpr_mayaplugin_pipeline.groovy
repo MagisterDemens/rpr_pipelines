@@ -276,13 +276,13 @@ def executeTests(String osName, String asicName, Map options)
         else
         {
             try {
-                String middle_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_maya_autotests_baselines" : "/mnt/c/TestResources/rpr_maya_autotests_baselines"
+                String baseline_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_maya_autotests_baselines" : "/mnt/c/TestResources/rpr_maya_autotests_baselines"
                 if (options.engine == '2'){
-                    middle_dir="${middle_dir}-NorthStar"
+                    baseline_dir="${baseline_dir}-NorthStar"
                 }
                 println "[INFO] Downloading reference images for ${options.tests}"
                 options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", middle_dir)
+                    receiveFiles("${REF_PATH_PROFILE}/${it}", baseline_dir)
                 }
             } catch (e) {
                 println("[WARNING] Problem when copying baselines. " + e.getMessage())
