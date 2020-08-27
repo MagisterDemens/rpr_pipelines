@@ -58,7 +58,7 @@ def executeBuildWindows(Map options)
                     }
 
                     try {
-                        dir('U\\integration')
+                        dir("U\\integration")
                         {
                             getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'])
                             bat """
@@ -87,9 +87,12 @@ def executeBuildWindows(Map options)
                         currentBuild.result = "FAILURE"
                         println "[ERROR] Failed to build UE on Windows"
                     } finally {
-                        bat """
-                            if exist ${win_build_name} rmdir /Q /S ${win_build_name}
-                        """
+                        String folderName = options['pluginType'] == "Standard" ? "UE-${version}" : "UE-${version}-${options.pluginType}"
+                        dir("U\\integration") {
+                            bat """
+                                if exist ${folderName} rmdir /Q /S ${folderName}
+                            """
+                        }
                     }
                 }
             }
@@ -142,13 +145,61 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    currentBuild.description = ""
-    ['projectBranch'].each
-    {
-        if(options[it] != 'master' && options[it] != "")
+    // manual job
+    if (options.forceBuild) {
+        options.executeBuild = true
+        options.executeTests = true
+    // auto job
+    } else {
+        // TODO: impelement initialization for auto jobs
+    }
+
+    if(!env.CHANGE_URL){
+
+        currentBuild.description = ""
+        ['projectBranch'].each
         {
-            currentBuild.description += "<b>${it}:</b> ${options[it]}<br/>"
+            if(options[it] != 'master' && options[it] != "")
+            {
+                currentBuild.description += "<b>${it}:</b> ${options[it]}<br/>"
+            }
         }
+
+        checkOutBranchOrScm(options['projectBranch'], 'git@github.com:luxteam/UnrealEngine_dev.git', true)
+
+        options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
+        options.commitMessage = bat (script: "git log --format=%%B -n 1", returnStdout: true).split('\r\n')[2].trim()
+        options.commitSHA = bat(script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+
+        println "The last commit was written by ${options.commitAuthor}."
+        println "Commit message: ${options.commitMessage}"
+        println "Commit SHA: ${options.commitSHA}"
+
+        currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
+        currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+        currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
+        
+        if (options.incrementVersion) {
+            // TODO implement incrementing of version 
+        }
+    }
+
+    if (env.BRANCH_NAME && env.BRANCH_NAME == "master") {
+        properties([[$class: 'BuildDiscarderProperty', strategy:
+                         [$class: 'LogRotator', artifactDaysToKeepStr: '',
+                          artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '25']]]);
+    } else if (env.BRANCH_NAME && BRANCH_NAME != "master") {
+        properties([[$class: 'BuildDiscarderProperty', strategy:
+                         [$class: 'LogRotator', artifactDaysToKeepStr: '',
+                          artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '25']]]);
+    } else if (env.CHANGE_URL ) {
+        properties([[$class: 'BuildDiscarderProperty', strategy:
+                         [$class: 'LogRotator', artifactDaysToKeepStr: '',
+                          artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10']]]);
+    } else {
+        properties([[$class: 'BuildDiscarderProperty', strategy:
+                         [$class: 'LogRotator', artifactDaysToKeepStr: '',
+                          artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '20']]]);
     }
 }
 
@@ -170,13 +221,14 @@ def call(String projectBranch = "",
          String graphicsAPI = '',
          String pluginRepository = '',
          Boolean forceDownloadUE = false,
+         Boolean forceBuild = false,
          Boolean enableNotifications = false) {
     try
     {
         String PRJ_NAME="UE"
         String PRJ_ROOT="gpuopen"
 
-        targets = targets.split(',')
+        targets = targets.split(', ')
         versions = versions.split(',')
         buildConfigurations = buildConfigurations.split(',')
         testsName = testsName.split(',')
@@ -211,13 +263,12 @@ def call(String projectBranch = "",
                                 graphicsAPI:graphicsAPI,
                                 source:source,
                                 forceDownloadUE:forceDownloadUE,
+                                forceBuild:forceBuild,
                                 enableNotifications:enableNotifications,
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 BUILDER_TAG:'BuilderU',
-                                BUILD_TIMEOUT:240,
-                                executeBuild:true,
-                                executeTests:false])
+                                BUILD_TIMEOUT:240])
     }
     catch(e) {
         currentBuild.result = "FAILED"
