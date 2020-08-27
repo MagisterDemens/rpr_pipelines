@@ -68,16 +68,6 @@ def getMaxPluginInstaller(String osName, Map options)
 
 def executeGenTestRefCommand(String osName, Map options)
 {
-    try
-    {
-        //for update existing manifest file
-        receiveFiles("${options.REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
-    }
-    catch(e)
-    {
-        println("baseline_manifest.json not found")
-    }
-
     dir('scripts')
     {
         switch(osName)
@@ -191,13 +181,13 @@ def executeTests(String osName, String asicName, Map options)
         else
         {
             try {
+                String middle_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_max_autotests_baselines" : "/mnt/c/TestResources/rpr_max_autotests_baselines"
                 println "[INFO] Downloading reference images for ${options.tests}"
-                receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
                 options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+                    receiveFiles("${REF_PATH_PROFILE}/${it}", middle_dir)
                 }
             } catch (e) {
-                println("[WARNING] Baseline doesn't exist.")
+                println("[WARNING] Problem when copying baselines. " + e.getMessage())
             }
             executeTestCommand(osName, asicName, options)
         }
