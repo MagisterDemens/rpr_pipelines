@@ -258,7 +258,7 @@ def executeTests(String osName, String asicName, Map options)
             throw e
         }
 
-        String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
+        String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}-NewStructure"
         if (options.engine == '2'){
             REF_PATH_PROFILE="${REF_PATH_PROFILE}-NorthStar"
         }
