@@ -9,7 +9,7 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
     if (!fileExists(targetFolderPath) || forceDownloadUE) {
         println("[INFO] UnrealEngine will be downloaded and configured")
         bat """
-            Build.bat Engine ${version} PrepareUE Development >> ..\\..\\PrepareUE.${STAGE_NAME}.log 2>&1
+            Build.bat Engine ${version} PrepareUE Development >> ..\\PrepareUE.${version}.log 2>&1
         """
 
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
@@ -28,14 +28,75 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
     }
 }
 
+
+def generateBuildNameWindows(String ue_version, String build_conf, String vs_ver, String graphics_api) {
+    return "${ue_version}_${build_conf}_vs${vs_ver}_${graphics_api}"
+}
+
+
 def executeBuildWindows(Map options)
 {
-    dir('U\\integration')
-    {
-        getPreparedUE(options['version'], options['pluginType'], options['forceDownloadUE'])
-        bat """
-            Build.bat ${options.targets.join(' ')} ${options.version} ${options.pluginType} ${options.engineConfiguration} ${options.testsVariants.join(' ')} ${options.testsName.join(' ')} ${options.visualStudioVersion} ${options.source} Dirty >> ..\\..\\${STAGE_NAME}.log 2>&1
-        """
+    options.versions.each() { ue_version ->
+        options.configurations.each() { build_conf ->
+            options.visualStudioVersions.each() { vs_ver ->
+                options.graphicsAPI.each() { graphics_api ->
+
+                    println "Current UnrealEngine version: ${ue_version}."
+                    println "Current configuration: ${build_conf}."
+                    println "Current VS version: ${vs_ver}."
+                    println "Current graphics API: ${graphics_api}."
+
+                    win_build_name = generateBuildNameWindows(ue_version, build_conf, vs_ver, graphics_api)
+
+                    try {
+                        dir('U\\integration')
+                        {
+                            getPreparedUE(options['version'], options['pluginType'], options['forceDownloadUE'])
+                            bat """
+                                Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName.join(' ')} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
+                            """
+
+                            if (options.targets.contains("Tests")) {
+                                dir ("Deploy\\Tests") {
+                                    bat """
+                                        rename ${ue_version} ${win_build_name}
+                                    """
+                                }
+                                dir ("Deploy\\Prerequirements") {
+                                    bat """
+                                        rename ${ue_version} ${win_build_name}
+                                    """
+                                }
+                            }
+                        }
+                    } catch (FlowInterruptedException e) {
+                        println "[INFO] Job was aborted during build stage"
+                        throw e
+                    } catch (e) {
+                        println(e.toString());
+                        println(e.getMessage());
+                        currentBuild.result = "FAILURE"
+                        println "[ERROR] Failed to build UE on Windows"
+                    } finally {
+                        bat """
+                            if exist ${win_build_name} rmdir /Q /S ${win_build_name}
+                        """
+                    }
+                }
+            }
+        }
+    }
+    if (options.targets.contains("Tests")) {
+        dir ("U\\integration") {
+            if (fileExists("Deploy\\Tests")) {
+                zip archive: true, dir: "Deploy", glob: '', zipFile: "WindowsTests.zip"
+
+                stash includes: "WindowsTests.zip", name: "UEWindowsTests"
+            } else {
+                println "[ERROR] Can't find folder with tests!"
+                currentBuild.result = "FAILURE"
+            }
+        }
     }
 }
 
@@ -65,7 +126,7 @@ def executeBuild(String osName, Map options)
         throw e
     }
     finally {
-        archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
+        archiveArtifacts artifacts: "U/*.log", allowEmptyArchive: true
         archiveArtifacts "U/integration/Logs/**/*.*"
     }                        
 }
@@ -91,12 +152,12 @@ def executeDeploy(Map options, List platformList, List testResultList)
 def call(String projectBranch = "",
          String platforms = 'Windows',
          String targets = '',
-         String version = '',
+         String versions = '',
          String pluginType = '',
-         String engineConfiguration = '',
-         String testsVariants = '',
+         String configurations = '',
+         String testsVariant = '',
          String testsName = '',
-         String visualStudioVersion = '',
+         String visualStudioVersions = '',
          String graphicsAPI = '',
          String pluginRepository = '',
          Boolean forceDownloadUE = false,
@@ -107,15 +168,31 @@ def call(String projectBranch = "",
         String PRJ_ROOT="gpuopen"
 
         targets = targets.split(',')
-        testsVariants = testsVariants.split(',')
+        versions = versions.split(',')
+        configurations = configurations.split(',')
         testsName = testsName.split(',')
+        visualStudioVersions = visualStudioVersions.split(',')
         graphicsAPI = graphicsAPI.split(',')
+
+        println "Targets: ${targets}"
+        println "Versions: ${versions}"
+        println "Plugin type: ${pluginType}"
+        println "Configuration: ${configurations}"
+        println "Tests variant: ${testsVariant}"
+        println "Tests name: ${testsName}"
+        println "Visual Studio version: ${visualStudioVersions}"
+        println "Graphics API: ${graphicsAPI}"
+
         for (int i = 0; i < graphicsAPI.length; i++) {
             // DX11 is selected if 'Vulkan' value isn't specified. There isn't special key for DX11
             if (graphicsAPI[i].contains("DX11")) {
                 graphicsAPI[i] = " "
                 break
             }
+        }
+        if (pluginType == "Standard") {
+            // set empty value for graphics api
+            graphicsAPI = [" "]
         }
 
         String source = ""
@@ -130,10 +207,10 @@ def call(String projectBranch = "",
                                 targets:targets,
                                 version:version,
                                 pluginType:pluginType,
-                                engineConfiguration:engineConfiguration,
-                                testsVariants:testsVariants,
+                                configurations:configurations,
+                                testsVariant:testsVariant,
                                 testsName:testsName,
-                                visualStudioVersion:visualStudioVersion,
+                                visualStudioVersions:visualStudioVersions,
                                 graphicsAPI:graphicsAPI,
                                 source:source,
                                 forceDownloadUE:forceDownloadUE,
