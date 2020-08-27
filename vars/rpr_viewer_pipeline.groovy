@@ -68,16 +68,6 @@ def getViewerTool(String osName, Map options)
 
 def executeGenTestRefCommand(String osName, Map options)
 {
-    try
-    {
-        //for update existing manifest file
-        receiveFiles("${options.REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
-    }
-    catch(e)
-    {
-        println("baseline_manifest.json not found")
-    }
-
     dir('scripts')
     {
         switch(osName)
@@ -198,15 +188,13 @@ def executeTests(String osName, String asicName, Map options)
             sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
         } else {
             try {
+                String middle_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_viewer_autotests_baselines" : "/mnt/c/TestResources/rpr_viewer_autotests_baselines"
                 println "[INFO] Downloading reference images for ${options.tests}"
-                receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
                 options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+                    receiveFiles("${REF_PATH_PROFILE}/${it}", middle_dir)
                 }
-            } 
-            catch (e)
-            {
-                println("Baseline doesn't exist.")
+            } catch (e) {
+                println("[WARNING] Problem when copying baselines. " + e.getMessage())
             }
             executeTestCommand(osName, asicName, options)
         }
