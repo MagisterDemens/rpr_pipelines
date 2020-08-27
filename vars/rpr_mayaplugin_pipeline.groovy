@@ -277,7 +277,7 @@ def executeTests(String osName, String asicName, Map options)
         {
             try {
                 String middle_dir = isUnix() ? "${CIS_TOOLS}/../TestResources/rpr_maya_autotests_baselines" : "/mnt/c/TestResources/rpr_maya_autotests_baselines"
-                if (options.engine == 'FULL2'){
+                if (options.engine == '2'){
                     middle_dir="${middle_dir}-NorthStar"
                 }
                 println "[INFO] Downloading reference images for ${options.tests}"
