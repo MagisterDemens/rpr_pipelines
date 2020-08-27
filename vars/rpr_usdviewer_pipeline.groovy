@@ -136,7 +136,6 @@ def call(String projectBranch = "",
 
     multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, null, null,
             [projectBranch:projectBranch,
-             vulkanWrappersBranch:vulkanWrappersBranch,
              testsBranch:testsBranch,
              updateRefs:updateRefs,
              enableNotifications:enableNotifications,
