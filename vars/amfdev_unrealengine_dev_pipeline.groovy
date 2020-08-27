@@ -32,6 +32,9 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
 
 
 def generateBuildNameWindows(String ue_version, String build_conf, String vs_ver, String graphics_api) {
+    if (!graphics_api.trim()) {
+        graphics_api = "DX11"
+    }
     return "${ue_version}_${build_conf}_vs${vs_ver}_${graphics_api}"
 }
 
@@ -49,6 +52,10 @@ def executeBuildWindows(Map options)
                     println "Current graphics API: ${graphics_api}."
 
                     win_build_name = generateBuildNameWindows(ue_version, build_conf, vs_ver, graphics_api)
+
+                    if (graphics_api == "DX11") {
+                        graphics_api = " "
+                    }
 
                     try {
                         dir('U\\integration')
@@ -184,18 +191,6 @@ def call(String projectBranch = "",
         println "Tests name: ${testsName}"
         println "Visual Studio version: ${visualStudioVersions}"
         println "Graphics API: ${graphicsAPI}"
-
-        for (int i = 0; i < graphicsAPI.length; i++) {
-            // DX11 is selected if 'Vulkan' value isn't specified. There isn't special key for DX11
-            if (graphicsAPI[i].contains("DX11")) {
-                graphicsAPI[i] = " "
-                break
-            }
-        }
-        if (pluginType == "Standard") {
-            // set empty value for graphics api
-            graphicsAPI = [" "]
-        }
 
         String source = ""
         if (pluginRepository.contains("amfdev")) {
