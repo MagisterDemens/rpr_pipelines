@@ -1,6 +1,6 @@
 def executeTests(String osName, String asicName, Map options)
 {
-    // TODO: implement tests stage
+    unstash "UEWindowsTests"
 }
 
 def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
