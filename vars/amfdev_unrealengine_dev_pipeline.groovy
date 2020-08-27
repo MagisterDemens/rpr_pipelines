@@ -87,7 +87,7 @@ def executeBuildWindows(Map options)
                         currentBuild.result = "FAILURE"
                         println "[ERROR] Failed to build UE on Windows"
                     } finally {
-                        String folderName = options['pluginType'] == "Standard" ? "UE-${version}" : "UE-${version}-${options.pluginType}"
+                        String folderName = options['pluginType'] == "Standard" ? "UE-${ue_version}" : "UE-${ue_version}-${options.pluginType}"
                         dir("U\\integration") {
                             bat """
                                 if exist ${folderName} rmdir /Q /S ${folderName}
