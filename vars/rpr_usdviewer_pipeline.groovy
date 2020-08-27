@@ -27,7 +27,7 @@ def executeBuildWindows(Map options)
         }
 
         // PySide
-        dir("RPRViewer\\deps\\PySide")
+        dir("RPRViewer\\deps\\PySide") {
             bat """
                 python setup.py install --ignore-git --parallel=%NUMBER_OF_PROCESSORS% >> ..\\..\\..\\${STAGE_NAME}.USDPixar.log 2>&1
             """
