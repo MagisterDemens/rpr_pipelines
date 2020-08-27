@@ -1,3 +1,5 @@
+import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
+
 def executeTests(String osName, String asicName, Map options)
 {
     unstash "UEWindowsTests"
