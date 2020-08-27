@@ -53,7 +53,7 @@ def executeBuildWindows(Map options)
                     try {
                         dir('U\\integration')
                         {
-                            getPreparedUE(options['version'], options['pluginType'], options['forceDownloadUE'])
+                            getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'])
                             bat """
                                 Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName.join(' ')} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
                             """
