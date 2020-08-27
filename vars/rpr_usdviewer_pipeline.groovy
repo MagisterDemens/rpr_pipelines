@@ -124,8 +124,6 @@ def executeDeploy(Map options, List platformList, List testResultList)
 {}
 
 def call(String projectBranch = "",
-         // FIXME: to master branch
-         String vulkanWrappersBranch = "db51573e1b65ff5f343f691bc95f7bc5400ef94d",
          String testsBranch = "master",
          String platforms = 'Windows',
          Boolean updateRefs = false,
