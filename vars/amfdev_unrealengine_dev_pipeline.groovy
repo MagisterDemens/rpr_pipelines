@@ -39,12 +39,12 @@ def generateBuildNameWindows(String ue_version, String build_conf, String vs_ver
 def executeBuildWindows(Map options)
 {
     options.versions.each() { ue_version ->
-        options.configurations.each() { build_conf ->
+        options.buildConfigurations.each() { build_conf ->
             options.visualStudioVersions.each() { vs_ver ->
                 options.graphicsAPI.each() { graphics_api ->
 
                     println "Current UnrealEngine version: ${ue_version}."
-                    println "Current configuration: ${build_conf}."
+                    println "Current build configuration: ${build_conf}."
                     println "Current VS version: ${vs_ver}."
                     println "Current graphics API: ${graphics_api}."
 
@@ -156,7 +156,7 @@ def call(String projectBranch = "",
          String targets = '',
          String versions = '',
          String pluginType = '',
-         String configurations = '',
+         String buildConfigurations = '',
          String testsVariant = '',
          String testsName = '',
          String visualStudioVersions = '',
@@ -171,7 +171,7 @@ def call(String projectBranch = "",
 
         targets = targets.split(',')
         versions = versions.split(',')
-        configurations = configurations.split(',')
+        buildConfigurations = buildConfigurations.split(',')
         testsName = testsName.split(',')
         visualStudioVersions = visualStudioVersions.split(',')
         graphicsAPI = graphicsAPI.split(',')
@@ -179,7 +179,7 @@ def call(String projectBranch = "",
         println "Targets: ${targets}"
         println "Versions: ${versions}"
         println "Plugin type: ${pluginType}"
-        println "Configuration: ${configurations}"
+        println "Build configurations: ${buildConfigurations}"
         println "Tests variant: ${testsVariant}"
         println "Tests name: ${testsName}"
         println "Visual Studio version: ${visualStudioVersions}"
@@ -209,7 +209,7 @@ def call(String projectBranch = "",
                                 targets:targets,
                                 versions:versions,
                                 pluginType:pluginType,
-                                configurations:configurations,
+                                buildConfigurations:buildConfigurations,
                                 testsVariant:testsVariant,
                                 testsName:testsName,
                                 visualStudioVersions:visualStudioVersions,
