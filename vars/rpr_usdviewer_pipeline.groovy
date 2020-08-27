@@ -3,62 +3,68 @@ def executeTests(String osName, String asicName, Map options)
 
 def executeBuildWindows(Map options)
 {
-    bat "del *.log"
-    // WORKSPACE redefined for cmake compatibility
-    withEnv(["PATH=c:\\python366\\;c:\\python366\\scripts\\;${PATH}", "WORKSPACE=${env.WORKSPACE.toString().replace('\\', '/')}"]) {
-        outputEnvironmentInfo("Windows", "${STAGE_NAME}.initEnv")
+    withEnv(["PATH=c:\\python366\\;c:\\python366\\scripts\\;${PATH}"]) {
+        outputEnvironmentInfo("Windows", "${STAGE_NAME}.EnvVariables")
 
-        dir("RadeonProVulkanWrapper") {
-            checkOutBranchOrScm("${options.vulkanWrappersBranch}", "git@github.com:Radeon-Pro/RadeonProVulkanWrapper.git")
+        // vcvars64.bat sets VS/msbuild env
+        bat """
+            call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat" >> ${STAGE_NAME}.vcvar.log 2>&1
+        """
 
-            bat """mkdir build
-            cd build
-            cmake ${options['cmakeKeysVulkanWrapper']} -G "Visual Studio 15 2017 Win64" .. >> ..\\..\\${STAGE_NAME}.VulkanWrapper.log 2>&1
-            cmake --build . --config Release >> ..\\..\\${STAGE_NAME}.VulkanWrapper.log 2>&1"""
-        }
-
-        dir("RPRViewer") {
-            checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
-
-            // add path to manually built python libraries
-            // discussed with dev - there is no way to implement on their side
-            powershell """(Get-Content USDPixar/build_scripts/build_usd.py) -replace '-DCMAKE_PREFIX_PATH="{depsInstDir}" ', '-DCMAKE_PREFIX_PATH="{depsInstDir};C:/JN/pyside-setup/pyside-setup/testenv3_install/py3.6-qt5.14.2-64bit-release/lib/cmake/PySide2-5.14.2.3;C:/JN/pyside-setup/pyside-setup/testenv3_install/py3.6-qt5.14.2-64bit-release/lib/cmake/Shiboken2-5.14.2.3" ' | Out-File -encoding ASCII USDPixar/build_scripts/build_usd.py"""
-
-            // vcvars64.bat sets VS/msbuild env
-            // git apply is required by devs
-            bat """call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat" >> ..\\${STAGE_NAME}.USD.log 2>&1
-            
-            pushd USDPixar
-            git apply ..\\usd_dev.patch >> ..\\..\\${STAGE_NAME}.USD.log 2>&1
-            popd
-            
-            python USDPixar/build_scripts/build_usd.py --build RPRViewer/build --src RPRViewer/deps RPRViewer/inst ^
-            --build-args "USD,-DRPR_LOCATION=${WORKSPACE}/RPRViewer/HdRPRPlugin/deps/RPR/RadeonProRender -DVID_WRAPPERS_DIR=${WORKSPACE}/RadeonProVulkanWrapper -DSHIBOKEN_BINARY=C:/JN/pyside-setup/pyside-setup/testenv3_install/py3.6-qt5.14.2-64bit-release/bin/shiboken2.exe" >> ..\\${STAGE_NAME}.USD.log 2>&1
-            
-            set PATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\bin;${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib;%PATH%
-            set PYTHONPATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib\\python;%PYTHONPATH%
-    
-            pushd HdRPRPlugin
-            mkdir build
-            pushd build
-            
-            cmake -G "Visual Studio 15 2017 Win64" -DUSD_ROOT=${WORKSPACE}/RPRViewer/RPRViewer/inst ^
-            -Dpxr_DIR=${WORKSPACE}/RPRViewer/USDPixar ^
-            -DRPR_BUILD_AS_HOUDINI_PLUGIN=FALSE ^
-            -DCMAKE_INSTALL_PREFIX=${WORKSPACE}/RPRViewer/RPRViewer/inst ^
-            -DPXR_USE_PYTHON_3=ON ^
-            .. >> ..\\..\\..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
-
-            cmake --build . --config RelWithDebInfo --target INSTALL >> ..\\..\\..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1 
+        // VulkanWrappers
+        dir("RPRViewer\\deps\\VidWrappers") {
+            bat """
+                cmake -G "Visual Studio 15 2017 Win64" -B build -DVW_ENABLE_RRNEXT=OFF >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
+                cmake --build build --target VidWrappers --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
+                cmake --build build --target SPVRemapper --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
             """
-            // TODO: filter files for archive
-            zip archive: true, dir: "RPRViewer/inst", glob: '', zipFile: "RadeonProUSDViewer_Windows.zip"
         }
+
+        dir("USDPixar") {
+            bat """
+                git apply ../usd_dev.patch  >> ..\\${STAGE_NAME}.USDPixar.log 2>&1
+            """
+        }
+
+        // PySide
+        dir("RPRViewer\\deps\\PySide")
+            bat """
+                python setup.py install --ignore-git --parallel=%NUMBER_OF_PROCESSORS% >> ..\\..\\..\\${STAGE_NAME}.USDPixar.log 2>&1
+            """
+        }
+
+        // USD
+        bat """
+            python USDPixar/build_scripts/build_usd.py --build RPRViewer/build --src RPRViewer/deps RPRViewer/inst >> ${STAGE_NAME}.USDPixar.log 2>&1
+        """
+
+        // for testing
+        //set PATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\bin;${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib;%PATH%
+        //set PYTHONPATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib\\python;%PYTHONPATH%
+
+        // HdRprPlugin
+        dir("HdRPRPlugin") {
+            bat """
+                set PXR_DIR=%CD%\\USDPixar
+                set INSTALL_PREFIX_DIR=%CD%\\RPRViewer\\inst
+
+                cmake -B build -G "Visual Studio 15 2017 Win64" -Dpxr_DIR=%PXR_DIR% -DCMAKE_INSTALL_PREFIX=%INSTALL_PREFIX_DIR% ^
+                    -DRPR_BUILD_AS_HOUDINI_PLUGIN=FALSE -DPXR_USE_PYTHON_3=ON >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
+                cmake --build build --config Release --target install >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
+            """
+        }
+        
+        // TODO: filter files for archive
+        zip archive: true, dir: "RPRViewer/inst", glob: '', zipFile: "RadeonProUSDViewer_Windows.zip"
+        
     }
 }
 
 def executeBuild(String osName, Map options)
 {
+
+    checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
+
     try {
         switch (osName) {
             case 'Windows':
@@ -144,6 +150,5 @@ def call(String projectBranch = "",
              executeTests:false,
              BUILD_TIMEOUT:90,
              DEPLOY_TIMEOUT:45,
-             cmakeKeysVulkanWrapper:"-DCMAKE_BUILD_TYPE=Release -DVW_ENABLE_RRNEXT=OFF",
              nodeRetry: nodeRetry])
 }
