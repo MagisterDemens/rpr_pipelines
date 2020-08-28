@@ -101,7 +101,7 @@ def executeBuildWindows(Map options)
     if (options.targets.contains("Tests")) {
         dir ("U\\integration") {
             if (fileExists("Deploy\\Tests")) {
-                zip archive: true, dir: "Deploy", glob: '', zipFile: "WindowsTests.zip"
+                zip archive: false, dir: "Deploy", glob: '', zipFile: "WindowsTests.zip"
 
                 stash includes: "WindowsTests.zip", name: "UEWindowsTests"
             } else {
