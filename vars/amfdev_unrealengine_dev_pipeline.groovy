@@ -5,7 +5,7 @@ def executeTests(String osName, String asicName, Map options)
     unstash "UEWindowsTests"
 }
 
-def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
+def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, String buildName) {
     String targetFolderPath = "${CIS_TOOLS}\\..\\PreparedUE\\UE-${version}"
     String folderName = pluginType == "Standard" ? "UE-${version}" : "UE-${version}-${pluginType}"
     if (!fileExists(targetFolderPath) || forceDownloadUE) {
@@ -13,6 +13,20 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
         bat """
             Build.bat Engine ${version} PrepareUE Development >> ..\\PrepareUE.${version}.log 2>&1
         """
+
+        dir("Logs") {
+            bat """
+                rename Build_* Build.${buildName}
+            """
+
+            dir("Build.${buildName}") {
+                String failures = bat(script: 'findstr "failed" results.csv', returnStdout: true)
+                if (failures) {
+                    println("[ERROR] Failed to prepare UE")
+                    throw new Exception("Failed to prepare UE")
+                }
+            }
+        }
 
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
         bat """
@@ -60,23 +74,60 @@ def executeBuildWindows(Map options)
                     try {
                         dir("U\\integration")
                         {
-                            getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'])
+                            getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'], win_build_name)
                             bat """
                                 Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName.join(' ')} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
                             """
 
-                            if (options.targets.contains("Tests")) {
-                                dir ("Deploy\\Tests") {
-                                    bat """
-                                        rename ${ue_version} ${win_build_name}
-                                    """
-                                }
-                                dir ("Deploy\\Prerequirements") {
-                                    bat """
-                                        rename ${ue_version} ${win_build_name}
-                                    """
+                            dir("Logs") {
+                                bat """
+                                    rename Build_* Build.${win_build_name}
+                                """
+
+                                dir("Build.${win_build_name}") {
+                                    String successes = bat(script: 'findstr "succeeded" results.csv', returnStdout: true).split('\n')
+                                    String failures = bat(script: 'findstr "failed" results.csv', returnStdout: true).split('\n')
+                                    if (!failures) {
+                                        println("[INFO] All targets was executed successfully")
+                                    }
+                                    if (successes) {
+                                        println("[INFO] Successfully executed targets (${successes.length}):")
+                                        for (success in successes) {
+                                            println("[INFO] Target: ${success.split(',')[0]}")
+                                        }
+                                    } else {
+                                        println("[INFO] There aren't successfully finished targets")
+                                    }
+
+                                    if (failures) {
+                                        println("[INFO] Failed targets (${failures.length}):")
+                                        for (failure in failures) {
+                                            println("[INFO] Target: ${failure.split(',')[0]}")
+                                        }
+                                        println("[ERROR] Failed to build UE (there are failed targets)")
+                                        throw new Exception("Failed to build UE (there are failed targets)")
+                                    }
                                 }
                             }
+
+                            try {
+                                if (options.targets.contains("Tests")) {
+                                    dir ("Deploy\\Tests") {
+                                        bat """
+                                            rename ${ue_version} ${win_build_name}
+                                        """
+                                    }
+                                    dir ("Deploy\\Prerequirements") {
+                                        bat """
+                                            rename ${ue_version} ${win_build_name}
+                                        """
+                                    }
+                                }  
+                            } catch (e) {
+                                println("[ERROR] Failed to access tests")
+                                throw e
+                            }
+
                         }
                     } catch (FlowInterruptedException e) {
                         println "[INFO] Job was aborted during build stage"
