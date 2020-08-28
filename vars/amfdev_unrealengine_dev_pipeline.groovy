@@ -31,9 +31,13 @@ def executeTestsWindows(String osName, String asicName, Map options)
                     }
 
                     dir("UETests\\Deploy\\Tests\\${win_build_name}") {
-                        String testsVariant = options['testsVariant'] == 'CPP' ? 'Cpp' : options['testsVariant']
-                        String logsFolder = "${options.testsName}${pluginType}${testsVariant}"
-                        String testsFolder = "${options.testsName}${pluginType}${testsVariant}_${build_conf}"
+                        String pluginType = options['pluginType'] == 'Stitch' ? 'StitchAmf' : "${options.testsName}${options.pluginType}"
+                        String testsFolder = options['testsVariant'] == 'CPP' ? "${pluginType}Cpp" : pluginType
+                        String logsFolder = testsFolder
+                        testsFolder = "${deployFolder}_${build_conf}"
+                        if (graphics_api == "Vulkan") {
+                            testsFolder = "${deployFolder}_Vulkan"
+                        }
                         dir("${testsFolder}") {
                             try {
                                 String[] testBats = bat(script: '@dir /b *.bat', returnStdout: true).trim().split('\n')
@@ -172,7 +176,7 @@ def executeBuildWindows(Map options)
                         {
                             getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'], win_build_name)
                             bat """
-                                Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName.join(' ')} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
+                                Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
                             """
 
                             dir("Logs") {
@@ -378,7 +382,6 @@ def call(String projectBranch = "",
         targets = targets.split(', ')
         versions = versions.split(',')
         buildConfigurations = buildConfigurations.split(',')
-        testsName = testsName.split(',')
         visualStudioVersions = visualStudioVersions.split(',')
         graphicsAPI = graphicsAPI.split(',')
 
