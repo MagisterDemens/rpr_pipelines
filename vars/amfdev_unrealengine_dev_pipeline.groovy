@@ -25,18 +25,18 @@ def executeTestsWindows(String osName, String asicName, Map options)
 
                     win_build_name = generateBuildNameWindows(ue_version, build_conf, vs_ver, graphics_api)
 
-                    if (!fileExists("UETests\\Deploy\\Tests\\${win_build_name}")) {
+                    if (!fileExists("UETests\\Tests\\${win_build_name}")) {
                         println("[ERROR] Can't find tests for this configuration")
                         return
                     }
 
-                    dir("UETests\\Deploy\\Tests\\${win_build_name}") {
+                    dir("UETests\\Tests\\${win_build_name}") {
                         String pluginType = options['pluginType'] == 'Stitch' ? 'StitchAmf' : "${options.testsName}${options.pluginType}"
                         String testsFolder = options['testsVariant'] == 'CPP' ? "${pluginType}Cpp" : pluginType
-                        String logsFolder = testsFolder
-                        testsFolder = "${deployFolder}_${build_conf}"
+                        String logsName = testsFolder
+                        testsFolder = "${testsFolder}_${build_conf}"
                         if (graphics_api == "Vulkan") {
-                            testsFolder = "${deployFolder}_Vulkan"
+                            testsFolder = "${testsFolder}_Vulkan"
                         }
                         dir("${testsFolder}") {
                             try {
@@ -56,9 +56,9 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                             if (causeClassName.contains("ExceededTimeout")) {
                                                 println("[INFO] Test ${testBat.trim()} was stopped")
                                                 try {
-                                                    dir("${logsFolder}\\Saved\\Logs") {
+                                                    dir("${logsName}\\Saved\\Logs") {
                                                         bat """
-                                                            rename *.log Tests.${testBat.trim().replace('.bat', '')}.log
+                                                            rename ${logsName}.log Tests.${testBat.trim().replace('.bat', '')}.log
                                                         """
                                                     }
                                                 } catch (e1) {
@@ -78,7 +78,7 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                 currentBuild.result = "FAILURE"
                                 println "[ERROR] Failed during testing ${win_build_name} configuration on ${asicName}-${osName}"
                             } finally {
-                                archiveArtifacts "${logsFolder}/Saved/Logs/*.*"
+                                archiveArtifacts "${logsName}/Saved/Logs/*.*"
                             }
                         }
                     }
@@ -170,13 +170,21 @@ def executeBuildWindows(Map options)
                     if (graphics_api == "DX11") {
                         graphics_api = " "
                     }
+                    String pluginBranch = ""
+                    if (options['pluginBranch']) {
+                        if (options['pluginType'] == 'AMF') {
+                            pluginBranch = "AmfBranch: ${options.pluginBranch}"
+                        } else if (options['pluginType'] == 'Stitch') {
+                            pluginBranch = "StitchBranch: ${options.pluginBranch}"
+                        }
+                    }
 
                     try {
                         dir("U\\integration")
                         {
                             getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'], win_build_name)
                             bat """
-                                Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName} ${vs_ver} ${graphics_api} ${options.source} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
+                                Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName} ${vs_ver} ${graphics_api} ${options.source} ${pluginBranch} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
                             """
 
                             dir("Logs") {
@@ -276,7 +284,7 @@ def executeBuild(String osName, Map options)
         switch(osName)
         {
         case 'Windows': 
-            executeBuildWindows(options); 
+            executeBuildWindows(options)
             break;
         case 'OSX':
             println("[WARNING] OSX is not supported")
@@ -371,6 +379,7 @@ def call(String projectBranch = "",
          String visualStudioVersions = '',
          String graphicsAPI = '',
          String pluginRepository = '',
+         String pluginBranch = '',
          Boolean forceDownloadUE = false,
          Boolean forceBuild = false,
          Boolean enableNotifications = false) {
@@ -412,6 +421,7 @@ def call(String projectBranch = "",
                                 visualStudioVersions:visualStudioVersions,
                                 graphicsAPI:graphicsAPI,
                                 source:source,
+                                pluginBranch:pluginBranch,
                                 forceDownloadUE:forceDownloadUE,
                                 forceBuild:forceBuild,
                                 enableNotifications:enableNotifications,
