@@ -1,8 +1,101 @@
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
+import hudson.AbortException
 
-def executeTests(String osName, String asicName, Map options)
+def executeTestsWindows(String osName, String asicName, Map options)
 {
-    unstash "UEWindowsTests"
+    try {
+        cleanWS(osName)
+        unstash "UEWindowsTests"
+        unzip zipFile: "WindowsTests.zip", dir: "UETests", quiet: true
+    } catch(e) {
+        println("[ERROR] Failed to prepare tests on ${env.NODE_NAME}")
+        println(e.toString())
+        throw e
+    }
+
+    options.versions.each() { ue_version ->
+        options.buildConfigurations.each() { build_conf ->
+            options.visualStudioVersions.each() { vs_ver ->
+                options.graphicsAPI.each() { graphics_api ->
+
+                    println "Current UnrealEngine version: ${ue_version}."
+                    println "Current build configuration: ${build_conf}."
+                    println "Current VS version: ${vs_ver}."
+                    println "Current graphics API: ${graphics_api}."
+
+                    win_build_name = generateBuildNameWindows(ue_version, build_conf, vs_ver, graphics_api)
+
+                    if (!fileExists("UETests\\Deploy\\Tests\\${win_build_name}")) {
+                        println("[ERROR] Can't find tests for this configuration")
+                        return
+                    }
+
+                    dir("UETests\\Deploy\\Tests\\${win_build_name}") {
+                        String testsVariant = options['testsVariant'] == 'CPP' ? 'Cpp' : options['testsVariant']
+                        String logsFolder = "${options.testsName}${pluginType}${testsVariant}"
+                        String testsFolder = "${options.testsName}${pluginType}${testsVariant}_${build_conf}"
+                        dir("${testsFolder}") {
+                            try {
+                                String[] testBats = bat(script: '@dir /b *.bat', returnStdout: true).trim().split('\n')
+                                for (testBat in testBats) {
+                                    try {
+                                        timeout(time: 15, unit: 'SECONDS') {
+                                            bat """
+                                                ${testBat.trim()}
+                                            """
+                                        }
+                                    } catch (FlowInterruptedException e) {
+                                        //Tests are playing endlessly. Stop them
+                                        e.getCauses().each(){
+                                            String causeClassName = it.getClass().toString()
+                                            println "Interruption cause: ${causeClassName}"
+                                            if (causeClassName.contains("ExceededTimeout")) {
+                                                println("[INFO] Test ${testBat.trim()} was stopped")
+                                                try {
+                                                    dir("${logsFolder}\\Saved\\Logs") {
+                                                        bat """
+                                                            rename *.log Tests.${testBat.trim().replace('.bat', '')}.log
+                                                        """
+                                                    }
+                                                } catch (e1) {
+                                                    println("[ERROR] Failed to rename logs of ${win_build_name} configuration on ${asicName}-${osName}")
+                                                }
+                                            } else {
+                                                throw e
+                                            }
+                                        }
+                                    } 
+                                }
+                            } catch (FlowInterruptedException e) {
+                                throw e
+                            } catch (e) {
+                                println(e.toString());
+                                println(e.getMessage());
+                                currentBuild.result = "FAILURE"
+                                println "[ERROR] Failed during testing ${win_build_name} configuration on ${asicName}-${osName}"
+                            } finally {
+                                archiveArtifacts "${logsFolder}/Saved/Logs/*.*"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def executeTests(String osName, String asicName, Map options) {
+    switch(osName) {
+        case 'Windows':
+            executeTestsWindows(osName, asicName, options)
+            break;
+        case 'OSX':
+            println("[WARNING] OSX is not supported")
+            break;
+        default:
+            println("[WARNING] ${osName} is not supported")
+            break;
+    }
 }
 
 def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, String buildName) {
@@ -15,17 +108,23 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, St
         """
 
         dir("Logs") {
+            String logsFolder = bat(script: '@dir /b Build_*', returnStdout: true).trim()
             bat """
-                rename Build_* Build.${buildName}
+                rename ${logsFolder} PrepareUE.${version}
             """
 
-            dir("Build.${buildName}") {
-                String failures = bat(script: 'findstr "failed" results.csv', returnStdout: true)
-                if (failures) {
-                    println("[ERROR] Failed to prepare UE")
-                    throw new Exception("Failed to prepare UE")
+            try {
+                dir("Build.${buildName}") {
+                    String failures = bat(script: '@findstr "failed" results.csv', returnStdout: true).trim()
+                    if (failures) {
+                        println("[ERROR] Failed to prepare UE")
+                        throw new Exception("Failed to prepare UE")
+                    }
                 }
+            } catch (AbortException e) {
+                // findstr returns exit code 1 if it didn't found any suitable line
             }
+
         }
 
         println("[INFO] Prepared UE is ready. Saving it for use in future builds...")
@@ -46,9 +145,6 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, St
 
 
 def generateBuildNameWindows(String ue_version, String build_conf, String vs_ver, String graphics_api) {
-    if (!graphics_api.trim()) {
-        graphics_api = "DX11"
-    }
     return "${ue_version}_${build_conf}_vs${vs_ver}_${graphics_api}"
 }
 
@@ -80,32 +176,34 @@ def executeBuildWindows(Map options)
                             """
 
                             dir("Logs") {
+                                String logsFolder = bat(script: '@dir /b Build_*', returnStdout: true).trim()
                                 bat """
-                                    rename Build_* Build.${win_build_name}
+                                    rename ${logsFolder} Build.${win_build_name}
                                 """
 
                                 dir("Build.${win_build_name}") {
-                                    String successes = bat(script: 'findstr "succeeded" results.csv', returnStdout: true).split('\n')
-                                    String failures = bat(script: 'findstr "failed" results.csv', returnStdout: true).split('\n')
-                                    if (!failures) {
-                                        println("[INFO] All targets was executed successfully")
-                                    }
-                                    if (successes) {
+                                    try {
+                                        String[] successes = bat(script: '@findstr "succeeded" results.csv', returnStdout: true).trim().split('\n')
                                         println("[INFO] Successfully executed targets (${successes.length}):")
                                         for (success in successes) {
-                                            println("[INFO] Target: ${success.split(',')[0]}")
+                                            println("[INFO] Target: ${success.trim().split(',')[0]}")
                                         }
-                                    } else {
-                                        println("[INFO] There aren't successfully finished targets")
+                                    } catch (AbortException e) {
+                                        // findstr returns exit code 1 if it didn't found any suitable line
+                                        println("[INFO] Can't find successfully executed targets")
                                     }
-
-                                    if (failures) {
+                                    
+                                    try {
+                                        String[] failures = bat(script: '@findstr "failed" results.csv', returnStdout: true).trim().split('\n')
                                         println("[INFO] Failed targets (${failures.length}):")
                                         for (failure in failures) {
-                                            println("[INFO] Target: ${failure.split(',')[0]}")
+                                            println("[INFO] Target: ${failure.trim().split(',')[0]}")
                                         }
                                         println("[ERROR] Failed to build UE (there are failed targets)")
                                         throw new Exception("Failed to build UE (there are failed targets)")
+                                    } catch (AbortException e) {
+                                        // findstr returns exit code 1 if it didn't found any suitable line
+                                        println("[INFO] Can't find failed targets")
                                     }
                                 }
                             }
@@ -130,7 +228,6 @@ def executeBuildWindows(Map options)
 
                         }
                     } catch (FlowInterruptedException e) {
-                        println "[INFO] Job was aborted during build stage"
                         throw e
                     } catch (e) {
                         println(e.toString());
@@ -169,9 +266,8 @@ def executeBuild(String osName, Map options)
         dir('U')
         {
             checkOutBranchOrScm(options['projectBranch'], 'git@github.com:luxteam/UnrealEngine_dev.git')
+            outputEnvironmentInfo(osName)
         }
-        
-        outputEnvironmentInfo(osName)
 
         switch(osName)
         {
