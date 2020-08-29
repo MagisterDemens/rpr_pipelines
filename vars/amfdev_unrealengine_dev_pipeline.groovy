@@ -438,7 +438,7 @@ def call(String projectBranch = "",
                                 PRJ_NAME:PRJ_NAME,
                                 PRJ_ROOT:PRJ_ROOT,
                                 BUILDER_TAG:'BuilderU',
-                                BUILD_TIMEOUT:240])
+                                BUILD_TIMEOUT:360])
     }
     catch(e) {
         currentBuild.result = "FAILED"
