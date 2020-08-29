@@ -62,7 +62,7 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                                         """
                                                     }
                                                 } catch (e1) {
-                                                    println("[ERROR] Failed to rename logs of ${win_build_name} configuration on ${asicName}-${osName}")
+                                                    println("[ERROR] Failed to access logs of ${win_build_name} configuration on ${asicName}-${osName}")
                                                 }
                                             } else {
                                                 throw e
@@ -78,7 +78,7 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                 currentBuild.result = "FAILURE"
                                 println "[ERROR] Failed during testing ${win_build_name} configuration on ${asicName}-${osName}"
                             } finally {
-                                archiveArtifacts "${logsName}/Saved/Logs/*.*"
+                                archiveArtifacts "${logsName}/Saved/Logs/*.*", allowEmptyArchive: true
                             }
                         }
                     }
@@ -307,7 +307,7 @@ def executeBuild(String osName, Map options)
     finally {
         dir("U") {
             archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
-            archiveArtifacts "integration/Logs/**/*.*"
+            archiveArtifacts "integration/Logs/**/*.*", allowEmptyArchive: true
         }
     }                        
 }
