@@ -58,7 +58,7 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                                 try {
                                                     dir("${logsName}\\Saved\\Logs") {
                                                         bat """
-                                                            rename ${logsName}.log Tests.${STAGE_NAME}.${testBat.trim().replace('.bat', '')}.log
+                                                            rename ${logsName}.log ${STAGE_NAME}.${testBat.trim().replace('.bat', '')}.log
                                                         """
                                                     }
                                                 } catch (e1) {
