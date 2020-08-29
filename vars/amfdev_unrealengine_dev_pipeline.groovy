@@ -58,7 +58,7 @@ def executeTestsWindows(String osName, String asicName, Map options)
                                                 try {
                                                     dir("${logsName}\\Saved\\Logs") {
                                                         bat """
-                                                            rename ${logsName}.log Tests.${testBat.trim().replace('.bat', '')}.log
+                                                            rename ${logsName}.log Tests.${STAGE_NAME}.${testBat.trim().replace('.bat', '')}.log
                                                         """
                                                     }
                                                 } catch (e1) {
@@ -102,7 +102,7 @@ def executeTests(String osName, String asicName, Map options) {
     }
 }
 
-def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, String buildName) {
+def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE) {
     String targetFolderPath = "${CIS_TOOLS}\\..\\PreparedUE\\UE-${version}"
     String folderName = pluginType == "Standard" ? "UE-${version}" : "UE-${version}-${pluginType}"
     if (!fileExists(targetFolderPath) || forceDownloadUE) {
@@ -118,11 +118,15 @@ def getPreparedUE(String version, String pluginType, Boolean forceDownloadUE, St
             """
 
             try {
-                dir("Build.${buildName}") {
+                dir("PrepareUE.${version}") {
+                    if (fileExists("results.csv")) {
                     String failures = bat(script: '@findstr "failed" results.csv', returnStdout: true).trim()
-                    if (failures) {
-                        println("[ERROR] Failed to prepare UE")
-                        throw new Exception("Failed to prepare UE")
+                        if (failures) {
+                            println("[ERROR] Failed to prepare UE")
+                            throw new Exception("Failed to prepare UE")
+                        }
+                    } else {
+                        throw new Exception("Can't find result.csv file")
                     }
                 }
             } catch (AbortException e) {
@@ -182,7 +186,7 @@ def executeBuildWindows(Map options)
                     try {
                         dir("U\\integration")
                         {
-                            getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'], win_build_name)
+                            getPreparedUE(ue_version, options['pluginType'], options['forceDownloadUE'])
                             bat """
                                 Build.bat ${options.targets.join(' ')} ${ue_version} ${options.pluginType} ${build_conf} ${options.testsVariant} ${options.testsName} ${vs_ver} ${graphics_api} ${options.source} ${pluginBranch} Dirty >> ..\\${STAGE_NAME}.${win_build_name}.log 2>&1
                             """
@@ -194,28 +198,32 @@ def executeBuildWindows(Map options)
                                 """
 
                                 dir("Build.${win_build_name}") {
-                                    try {
-                                        String[] successes = bat(script: '@findstr "succeeded" results.csv', returnStdout: true).trim().split('\n')
-                                        println("[INFO] Successfully executed targets (${successes.length}):")
-                                        for (success in successes) {
-                                            println("[INFO] Target: ${success.trim().split(',')[0]}")
+                                    if (fileExists("results.csv")) {
+                                        try {
+                                            String[] successes = bat(script: '@findstr "succeeded" results.csv', returnStdout: true).trim().split('\n')
+                                            println("[INFO] Successfully executed targets (${successes.length}):")
+                                            for (success in successes) {
+                                                println("[INFO] Target: ${success.trim().split(',')[0]}")
+                                            }
+                                        } catch (AbortException e) {
+                                            // findstr returns exit code 1 if it didn't found any suitable line
+                                            println("[INFO] Can't find successfully executed targets")
                                         }
-                                    } catch (AbortException e) {
-                                        // findstr returns exit code 1 if it didn't found any suitable line
-                                        println("[INFO] Can't find successfully executed targets")
-                                    }
-                                    
-                                    try {
-                                        String[] failures = bat(script: '@findstr "failed" results.csv', returnStdout: true).trim().split('\n')
-                                        println("[INFO] Failed targets (${failures.length}):")
-                                        for (failure in failures) {
-                                            println("[INFO] Target: ${failure.trim().split(',')[0]}")
+                                        
+                                        try {
+                                            String[] failures = bat(script: '@findstr "failed" results.csv', returnStdout: true).trim().split('\n')
+                                            println("[INFO] Failed targets (${failures.length}):")
+                                            for (failure in failures) {
+                                                println("[INFO] Target: ${failure.trim().split(',')[0]}")
+                                            }
+                                            println("[ERROR] Failed to build UE (there are failed targets)")
+                                            throw new Exception("Failed to build UE (there are failed targets)")
+                                        } catch (AbortException e) {
+                                            // findstr returns exit code 1 if it didn't found any suitable line
+                                            println("[INFO] Can't find failed targets")
                                         }
-                                        println("[ERROR] Failed to build UE (there are failed targets)")
-                                        throw new Exception("Failed to build UE (there are failed targets)")
-                                    } catch (AbortException e) {
-                                        // findstr returns exit code 1 if it didn't found any suitable line
-                                        println("[INFO] Can't find failed targets")
+                                    } else {
+                                        throw new Exception("Can't find result.csv file")
                                     }
                                 }
                             }
@@ -297,8 +305,10 @@ def executeBuild(String osName, Map options)
         throw e
     }
     finally {
-        archiveArtifacts artifacts: "U/*.log", allowEmptyArchive: true
-        archiveArtifacts "U/integration/Logs/**/*.*"
+        dir("U") {
+            archiveArtifacts artifacts: "*.log", allowEmptyArchive: true
+            archiveArtifacts "integration/Logs/**/*.*"
+        }
     }                        
 }
 
