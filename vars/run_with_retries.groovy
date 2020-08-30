@@ -1,4 +1,4 @@
-def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLastNode, def stageName, def options, List allowedExceptions = [], Integer maxNumberOfRetries = -1) {
+def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLastNode, def stageName, def options, List allowedExceptions = [], Integer maxNumberOfRetries = -1, String osName = "", Boolean setBuildStatus = false) {
     List nodesListAll = nodesByLabel label: labels, offline: true
     List nodesListOnline = nodesByLabel label: labels, offline: false
     println "[INFO] Found ${nodesListOnline.size()} suitable online nodes (total suitable nodes: ${nodesListAll.size()})"
@@ -22,7 +22,7 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
         }
     }
 
-    if (maxNumberOfRetries != -1 && tries > maxNumberOfRetries) {
+    if (maxNumberOfRetries > 0 && tries > maxNumberOfRetries) {
         tries = maxNumberOfRetries
     }
 
@@ -31,16 +31,18 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
 
     for (int i = 0; i < tries; i++)
     {
+        options['currentTry'] = i
         node(labels)
         {
             timeout(time: "${stageTimeout}", unit: 'MINUTES')
             {
                 ws("WS/${options.PRJ_NAME}_${stageName}") {
-                    successCurrentNode = false
-
                     try {
-                        retringFunction(nodesListOnline)
+                        retringFunction(nodesListOnline, i)
                         successCurrentNode = true
+                        if (stageName != 'Test' && options.problemMessageManager) {
+                            options.problemMessageManager.clearErrorReasons(stageName, osName) 
+                        }
                     } catch(Exception e) {
                         String exceptionClassName = e.getClass().toString()
 
@@ -52,9 +54,15 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
                                 String causeClassName = it.getClass().toString()
                                 println "Interruption cause: ${causeClassName}"
                                 if (causeClassName.contains("CancelledCause")) {
-                                    println "GOT NEW COMMIT"
+                                    if (options.problemMessageManager) {
+                                        options.problemMessageManager.saveSpecificFailReason("Build was aborted by new commit", stageName, osName) 
+                                    }
+                                    println "[INFO] GOT NEW COMMIT"
                                     throw e
                                 } else if (causeClassName.contains("UserInterruption")) {
+                                    if (options.problemMessageManager) {
+                                        options.problemMessageManager.saveSpecificFailReason("Build was aborted by user", stageName, osName) 
+                                    }
                                     println "[INFO] Build was aborted by user"
                                     throw e
                                 }
@@ -79,7 +87,7 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
                             }
                         }
 
-                        println "[ERROR] Failed during tests on ${env.NODE_NAME} node"
+                        println "[ERROR] Failed on ${env.NODE_NAME} node"
                         println "Exception: ${e.toString()}"
                         println "Exception message: ${e.getMessage()}"
                         println "Exception cause: ${e.getCause()}"
@@ -97,10 +105,39 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
 
                             if (!isExceptionAllowed) {
                                 println("[INFO] Exception isn't allowed")
+                                if (options.problemMessageManager) {
+                                    if (stageName == 'Test') {
+                                        options.problemMessageManager.saveGeneralFailReason("Some tests failed", stageName, osName)
+                                    } else if (utils.isTimeoutExceeded(e)) {
+                                        options.problemMessageManager.saveGeneralFailReason("Timeout exceeded", stageName, osName)
+                                    } else {
+                                        options.problemMessageManager.saveGeneralFailReason("Unknown reason", stageName, osName)
+                                    }
+                                }
+                                if (setBuildStatus) {
+                                    currentBuild.result = "FAILURE"
+                                }
                                 throw e
                             } else {
                                 println("[INFO] Exception found in allowed exceptions")
                             }
+                        }
+
+                        if (i == tries - 1) {
+                            if (options.problemMessageManager) {
+                                if (stageName == 'Test') {
+                                    options.problemMessageManager.saveGeneralFailReason("Some tests failed", stageName, osName)
+                                } else if (utils.isTimeoutExceeded(e)) {
+                                    options.problemMessageManager.saveGeneralFailReason("Timeout exceeded", stageName, osName)
+                                } else {
+                                    options.problemMessageManager.saveGeneralFailReason("Unknown reason", stageName, osName)
+                                }
+                            }
+                            println "[ERROR] All nodes on ${stageName} stage with labels ${labels} failed."
+                            if (setBuildStatus) {
+                                currentBuild.result = "FAILURE"
+                            }
+                            throw e
                         }
                     }
 
@@ -114,9 +151,5 @@ def call(String labels, def stageTimeout, def retringFunction, Boolean reuseLast
                 }
             }
         }
-    }
-    if (!successCurrentNode) {
-        currentBuild.result = "FAILURE"
-        println "[ERROR] All nodes on ${stageName} stage with labels ${labels} failed."
     }
 }
