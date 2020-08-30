@@ -3,6 +3,7 @@ import UniverseClient
 import groovy.json.JsonOutput;
 
 @Field UniverseClient universeClient = new UniverseClient(this, "https://umsapi.cis.luxoft.com", env, "https://imgs.cis.luxoft.com", "AMD%20Radeon™%20ProRender%20for%203ds%20Max")
+@Field ProblemMessageManager problemMessageManager = new ProblemMessageManager(this, currentBuild)
 
 
 def getMaxPluginInstaller(String osName, Map options)
@@ -144,30 +145,40 @@ def executeTests(String osName, String asicName, Map options)
     Boolean stashResults = true
     
     try {
-
-        timeout(time: "5", unit: 'MINUTES') {
-            try {
+        try {
+            timeout(time: "5", unit: 'MINUTES') {
                 cleanWS(osName)
-
                 checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_max.git')
-
                 println "[INFO] Preparing successfully finished."
-
-            } catch(e) {
-                println("[ERROR] Failed to prepare test group")
-                println(e.toString())
-                throw e
             }
+        } catch (e) {
+            if (utils.isTimeoutExceeded(e)) {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group (timeout exceeded)", e)
+            } else {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group", e)
+            }            
         }
 
-        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/MaxAssets/", 'MaxAssets')
+        try {
+            downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/MaxAssets/", 'MaxAssets')
+        } catch (Exception e) {
+            throw new ExpectedExceptionWrapper("Failed downloading of Assets", e)
+        }
 
         try {
-            Boolean newPluginInstalled = false
-            timeout(time: "15", unit: 'MINUTES') {
-                getMaxPluginInstaller(osName, options)
-                newPluginInstalled = installMSIPlugin(osName, 'Max', options)
-                println "[INFO] Install function return ${newPluginInstalled}"
+            try {
+                Boolean newPluginInstalled = false
+                timeout(time: "15", unit: 'MINUTES') {
+                    getMaxPluginInstaller(osName, options)
+                    newPluginInstalled = installMSIPlugin(osName, 'Max', options)
+                    println "[INFO] Install function return ${newPluginInstalled}"
+                }
+            } catch (e) {
+                if (utils.isTimeoutExceeded(e)) {
+                    throw new ExpectedExceptionWrapper("Failed to install plugin (timeout exceeded)", e)
+                } else {
+                    throw new ExpectedExceptionWrapper("Failed to install plugin", e)
+                }
             }
         } catch(e) {
             println(e.toString())
@@ -182,25 +193,30 @@ def executeTests(String osName, String asicName, Map options)
 
         outputEnvironmentInfo(osName, options.stageName)
 
-        if(options['updateRefs'])
-        {
-            executeTestCommand(osName, asicName, options)
-            executeGenTestRefCommand(osName, options)
-            sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
-        }
-        else
-        {
-            try {
-                println "[INFO] Downloading reference images for ${options.tests}"
-                receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
-                options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
-                }
-            } catch (e) {
-                println("[WARNING] Baseline doesn't exist.")
+        try {
+            if(options['updateRefs'])
+            {
+                executeTestCommand(osName, asicName, options)
+                executeGenTestRefCommand(osName, options)
+                sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
             }
-            executeTestCommand(osName, asicName, options)
+            else
+            {
+                try {
+                    println "[INFO] Downloading reference images for ${options.tests}"
+                    receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
+                    options.tests.split(" ").each() {
+                        receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+                    }
+                } catch (e) {
+                    println("[WARNING] Baseline doesn't exist.")
+                }
+                executeTestCommand(osName, asicName, options)
+            }
+        } catch (e) {
+            throw new ExpectedExceptionWrapper(e.getMessage()?:"Unknown reason", e)
         }
+
     } catch (e) {
         if (options.currentTry < options.nodeReallocateTries) {
             stashResults = false
@@ -221,13 +237,6 @@ def executeTests(String osName, String asicName, Map options)
                     def sessionReport = null
                     sessionReport = readJSON file: 'Results/Max/session_report.json'
 
-                    // if none launched tests - mark build failed
-                    if (sessionReport.summary.total == 0)
-                    {
-                        options.failureMessage = "Noone test was finished for: ${asicName}-${osName}"
-                        currentBuild.result = "FAILED"
-                    }
-
                     if (options.sendToUMS)
                     {
                         universeClient.stage("Tests-${osName}-${asicName}", "end")
@@ -236,14 +245,12 @@ def executeTests(String osName, String asicName, Map options)
                     echo "Stashing test results to : ${options.testResultsName}"
                     stash includes: '**/*', name: "${options.testResultsName}", allowEmpty: true
 
-                    // deinstalling broken addon & reallocate node if there are still attempts
+                    // deinstalling broken addon
                     if (sessionReport.summary.total == sessionReport.summary.error + sessionReport.summary.skipped) {
                         if (sessionReport.summary.total != sessionReport.summary.skipped){
-                            collectCrashInfo(osName, options)
+                            collectCrashInfo(osName, options, options.currentTry)
                             installMSIPlugin(osName, "Max", options, false, true)
-                            if (options.currentTry < options.nodeReallocateTries) {
-                                throw new Exception("All tests crashed")
-                            }
+                            throw new ExpectedExceptionWrapper("All tests crashed", new Exception("All tests crashed"))
                         }
                     }
                 }
@@ -303,24 +310,33 @@ def executeBuild(String osName, Map options)
     try {
         dir('RadeonProRenderMaxPlugin')
         {
-            checkOutBranchOrScm(options.projectBranch, options.projectRepo)
+            try {
+                checkOutBranchOrScm(options.projectBranch, options.projectRepo)
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of plugin repository", "Build", osName)
+                throw e
+            }
         }
 
         outputEnvironmentInfo(osName)
 
-        switch(osName)
-        {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        default:
-            echo "[WARNING] ${osName} is not supported"
+        try {
+            switch(osName)
+            {
+            case 'Windows':
+                executeBuildWindows(options);
+                break;
+            default:
+                echo "[WARNING] ${osName} is not supported"
+            }
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed during plugin building", "Build", osName)
+            throw e
         }
 
         //stash includes: 'Bin/**/*', name: "app${osName}"
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         throw e
     }
     finally {
@@ -380,7 +396,12 @@ def executePreBuild(Map options)
     if (!options['isPreBuilt']) {
         dir('RadeonProRenderMaxPlugin')
         {
-            checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
+            try {
+                checkOutBranchOrScm(options.projectBranch, options.projectRepo, true)
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of plugin repository", "PreBuild")
+                throw e
+            }
 
             options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
             options.commitMessage = bat (script: "git log --format=%%s -n 1", returnStdout: true).split('\r\n')[2].trim().replace('\n', '')
@@ -398,51 +419,57 @@ def executePreBuild(Map options)
                 currentBuild.description = "<b>Project branch:</b> ${env.BRANCH_NAME}<br/>"
             }
 
-            options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
+            try {
+                options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
 
-            if (options['incrementVersion']) {
-                if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
+                if (options['incrementVersion']) {
+                    if(env.BRANCH_NAME == "develop" && options.commitAuthor != "radeonprorender") {
 
-                    println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
-                    println "[INFO] Current build version: ${options.pluginVersion}"
+                        println "[INFO] Incrementing version of change made by ${options.commitAuthor}."
+                        println "[INFO] Current build version: ${options.pluginVersion}"
 
-                    def new_version = version_inc(options.pluginVersion, 3)
-                    println "[INFO] New build version: ${new_version}"
-                    version_write("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR', new_version)
+                        def new_version = version_inc(options.pluginVersion, 3)
+                        println "[INFO] New build version: ${new_version}"
+                        version_write("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR', new_version)
 
-                    options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
-                    println "[INFO] Updated build version: ${options.pluginVersion}"
+                        options.pluginVersion = version_read("${env.WORKSPACE}\\RadeonProRenderMaxPlugin\\version.h", '#define VERSION_STR')
+                        println "[INFO] Updated build version: ${options.pluginVersion}"
 
-                    bat """
-                      git add version.h
-                      git commit -m "buildmaster: version update to ${options.pluginVersion}"
-                      git push origin HEAD:develop
-                    """
+                        bat """
+                          git add version.h
+                          git commit -m "buildmaster: version update to ${options.pluginVersion}"
+                          git push origin HEAD:develop
+                        """
 
-                    //get commit's sha which have to be build
-                    options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
-                    options.projectBranch = options.commitSHA
-                    println "[INFO] Project branch hash: ${options.projectBranch}"
-                }
-                else
-                {
-                    if(options.commitMessage.contains("CIS:BUILD"))
-                    {
-                        options['executeBuild'] = true
+                        //get commit's sha which have to be build
+                        options.commitSHA = bat (script: "git log --format=%%H -1 ", returnStdout: true).split('\r\n')[2].trim()
+                        options.projectBranch = options.commitSHA
+                        println "[INFO] Project branch hash: ${options.projectBranch}"
                     }
-
-                    if(options.commitMessage.contains("CIS:TESTS"))
+                    else
                     {
-                        options['executeBuild'] = true
-                        options['executeTests'] = true
+                        if(options.commitMessage.contains("CIS:BUILD"))
+                        {
+                            options['executeBuild'] = true
+                        }
+
+                        if(options.commitMessage.contains("CIS:TESTS"))
+                        {
+                            options['executeBuild'] = true
+                            options['executeTests'] = true
+                        }
                     }
                 }
+
+                currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
+                currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
+                currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
+                currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
+
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed increment version", "PreBuild")
+                throw e
             }
-
-            currentBuild.description += "<b>Version:</b> ${options.pluginVersion}<br/>"
-            currentBuild.description += "<b>Commit author:</b> ${options.commitAuthor}<br/>"
-            currentBuild.description += "<b>Commit message:</b> ${options.commitMessage}<br/>"
-            currentBuild.description += "<b>Commit SHA:</b> ${options.commitSHA}<br/>"
         }
     }
 
@@ -470,10 +497,16 @@ def executePreBuild(Map options)
 
     dir('jobs_test_max')
     {
-        checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_max.git')
+        try {
+            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_max.git')
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "PreBuild")
+            throw e
+        }
 
         if(options.testsPackage != "none")
         {
+            // json means custom test suite. Split doesn't supported
             if(options.testsPackage.endsWith('.json'))
             {
                 def testsByJson = readJSON file: "jobs/${options.testsPackage}"
@@ -545,7 +578,12 @@ def executeDeploy(Map options, List platformList, List testResultList)
     try {
         if(options['executeTests'] && testResultList)
         {
-            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_max.git')
+            try {
+                checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_max.git')
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "Deploy")
+                throw e
+            }
 
             List lostStashes = []
 
@@ -613,9 +651,11 @@ def executeDeploy(Map options, List platformList, List testResultList)
                     }
                 }
             } catch(e) {
+                problemMessageManager.saveSpecificFailReason("Failed report building", "Deploy")
                 println("ERROR during report building")
                 println(e.toString())
                 println(e.getMessage())
+                throw e
             }
 
             try
@@ -648,19 +688,25 @@ def executeDeploy(Map options, List platformList, List testResultList)
             {
                 def summaryReport = readJSON file: 'summaryTestResults/summary_status.json'
                 if (summaryReport.error > 0) {
-                    println("Some tests crashed")
-                    currentBuild.result="FAILED"
+                    println("[INFO] Some tests marked as error. Build result = FAILURE.")
+                    currentBuild.result = "FAILURE"
+
+                    problemMessageManager.saveGlobalFailReason("Some tests marked as error")
                 }
                 else if (summaryReport.failed > 0) {
-                    println("Some tests failed")
-                    currentBuild.result="UNSTABLE"
-                } else {
-                    currentBuild.result="SUCCESS"
+                    println("[INFO] Some tests marked as failed. Build result = UNSTABLE.")
+                    currentBuild.result = "UNSTABLE"
+
+                    problemMessageManager.saveUnstableReason("Some tests marked as failed")
                 }
             }
             catch(e)
             {
+                println(e.toString())
+                println(e.getMessage())
                 println("CAN'T GET TESTS STATUS")
+                problemMessageManager.saveUnstableReason("Can't get tests status")
+                currentBuild.result = "UNSTABLE"
             }
 
             try
@@ -674,8 +720,13 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 options.testsStatus = ""
             }
 
-            utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
-                "Test Report", "Summary Report, Performance Report, Compare Report")
+            try {
+                utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
+                    "Test Report", "Summary Report, Performance Report, Compare Report")
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed report publishing", "Deploy")
+                throw e
+            }
 
             if (options.sendToUMS) {
                 try {
@@ -688,8 +739,8 @@ def executeDeploy(Map options, List platformList, List testResultList)
         }
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         println(e.toString());
+        println(e.getMessage());
         throw e
     }
     finally
@@ -736,103 +787,120 @@ def call(String projectRepo = "git@github.com:GPUOpen-LibrariesAndSDKs/RadeonPro
     iter = (iter == 'Default') ? '120' : iter
     theshold = (theshold == 'Default') ? '0.01' : theshold
     def nodeRetry = []
-    try
-    {
-        Boolean isPreBuilt = customBuildLinkWindows.length() > 0
+    Map options = [:]
 
-        if (isPreBuilt)
-        {
-            //remove platforms for which pre built plugin is not specified
-            String filteredPlatforms = ""
+    try {
+        try {
+            Boolean isPreBuilt = customBuildLinkWindows.length() > 0
 
+            if (isPreBuilt)
+            {
+                //remove platforms for which pre built plugin is not specified
+                String filteredPlatforms = ""
+
+                platforms.split(';').each()
+                { platform ->
+                    List tokens = platform.tokenize(':')
+                    String platformName = tokens.get(0)
+
+                    switch(platformName)
+                    {
+                    case 'Windows':
+                        if (customBuildLinkWindows)
+                        {
+                            filteredPlatforms = appendPlatform(filteredPlatforms, platform)
+                        }
+                        break;
+                    }
+                }
+
+                platforms = filteredPlatforms
+            }
+
+            // if (tests == "" && testsPackage == "none") { currentBuild.setKeepLog(true) }
+
+            String PRJ_NAME="RadeonProRenderMaxPlugin"
+            String PRJ_ROOT="rpr-plugins"
+            gpusCount = 0
             platforms.split(';').each()
             { platform ->
                 List tokens = platform.tokenize(':')
-                String platformName = tokens.get(0)
-
-                switch(platformName)
+                if (tokens.size() > 1)
                 {
-                case 'Windows':
-                    if (customBuildLinkWindows)
+                    gpuNames = tokens.get(1)
+                    gpuNames.split(',').each()
                     {
-                        filteredPlatforms = appendPlatform(filteredPlatforms, platform)
+                        gpusCount += 1
                     }
-                    break;
                 }
             }
 
-            platforms = filteredPlatforms
+            def universePlatforms = convertPlatforms(platforms);
+
+            println "Platforms: ${platforms}"
+            println "Tests: ${tests}"
+            println "Tests package: ${testsPackage}"
+            println "Split tests execution: ${splitTestsExecution}"
+            println "UMS platforms: ${universePlatforms}"
+
+            options << [projectRepo:projectRepo,
+                        projectBranch:projectBranch,
+                        testsBranch:testsBranch,
+                        updateRefs:updateRefs,
+                        enableNotifications:enableNotifications,
+                        PRJ_NAME:PRJ_NAME,
+                        PRJ_ROOT:PRJ_ROOT,
+                        incrementVersion:incrementVersion,
+                        renderDevice:renderDevice,
+                        testsPackage:testsPackage,
+                        tests:tests,
+                        toolVersion:toolVersion,
+                        executeBuild:false,
+                        executeTests:isPreBuilt,
+                        isPreBuilt:isPreBuilt,
+                        forceBuild:forceBuild,
+                        reportName:'Test_20Report',
+                        splitTestsExecution:splitTestsExecution,
+                        sendToUMS: sendToUMS,
+                        gpusCount:gpusCount,
+                        TEST_TIMEOUT:180,
+                        ADDITIONAL_XML_TIMEOUT:30,
+                        REGRESSION_TIMEOUT:120,
+                        TESTER_TAG:tester_tag,
+                        universePlatforms: universePlatforms,
+                        resX: resX,
+                        resY: resY,
+                        SPU: SPU,
+                        iter: iter,
+                        theshold: theshold,
+                        customBuildLinkWindows: customBuildLinkWindows,
+                        nodeRetry: nodeRetry,
+                        problemMessageManager: problemMessageManager
+                        ]
         }
-
-        // if (tests == "" && testsPackage == "none") { currentBuild.setKeepLog(true) }
-
-        String PRJ_NAME="RadeonProRenderMaxPlugin"
-        String PRJ_ROOT="rpr-plugins"
-        gpusCount = 0
-        platforms.split(';').each()
-        { platform ->
-            List tokens = platform.tokenize(':')
-            if (tokens.size() > 1)
-            {
-                gpuNames = tokens.get(1)
-                gpuNames.split(',').each()
-                {
-                    gpusCount += 1
-                }
-            }
-        }
-
-        def universePlatforms = convertPlatforms(platforms);
-
-        println "Platforms: ${platforms}"
-        println "Tests: ${tests}"
-        println "Tests package: ${testsPackage}"
-        println "Split tests execution: ${splitTestsExecution}"
-        println "UMS platforms: ${universePlatforms}"
-
-        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
-                               [projectRepo:projectRepo,
-                                projectBranch:projectBranch,
-                                testsBranch:testsBranch,
-                                updateRefs:updateRefs,
-                                enableNotifications:enableNotifications,
-                                PRJ_NAME:PRJ_NAME,
-                                PRJ_ROOT:PRJ_ROOT,
-                                incrementVersion:incrementVersion,
-                                renderDevice:renderDevice,
-                                testsPackage:testsPackage,
-                                tests:tests,
-                                toolVersion:toolVersion,
-                                executeBuild:false,
-                                executeTests:isPreBuilt,
-                                isPreBuilt:isPreBuilt,
-                                forceBuild:forceBuild,
-                                reportName:'Test_20Report',
-                                splitTestsExecution:splitTestsExecution,
-                                sendToUMS: sendToUMS,
-                                gpusCount:gpusCount,
-                                TEST_TIMEOUT:180,
-                                ADDITIONAL_XML_TIMEOUT:30,
-                                REGRESSION_TIMEOUT:120,
-                                TESTER_TAG:tester_tag,
-                                universePlatforms: universePlatforms,
-                                resX: resX,
-                                resY: resY,
-                                SPU: SPU,
-                                iter: iter,
-                                theshold: theshold,
-                                customBuildLinkWindows: customBuildLinkWindows,
-                                nodeRetry: nodeRetry
-                                ])
-        }
-        catch (e) {
-            currentBuild.result = "FAILED"
-            if (sendToUMS){
-                universeClient.changeStatus(currentBuild.result)
-            }
-            println(e.toString());
-            println(e.getMessage());
+        catch (e)
+        {
+            problemMessageManager.saveSpecificFailReason("Failed initialization", "Init")
 
             throw e
         }
+
+        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy, options)
+    }
+    catch(e)
+    {
+        currentBuild.result = "FAILURE"
+        if (sendToUMS){
+            universeClient.changeStatus(currentBuild.result)
+        }
+        println(e.toString());
+        println(e.getMessage());
+
+        throw e
+    }
+    finally
+    {
+        problemMessageManager.publishMessages()
+    }
+
 }
