@@ -1,8 +1,9 @@
 import UniverseClient
 import groovy.transform.Field
+import groovy.json.JsonOutput;
 
 @Field UniverseClient universeClient = new UniverseClient(this, "https://umsapi.cis.luxoft.com", env, "https://imgs.cis.luxoft.com", "AMD%20Radeon™%20ProRender%20Viewer")
-import groovy.json.JsonOutput;
+@Field ProblemMessageManager problemMessageManager = new ProblemMessageManager(this, currentBuild)
 
 def getViewerTool(String osName, Map options)
 {
@@ -170,20 +171,25 @@ def executeTests(String osName, String asicName, Map options)
     Boolean stashResults = true
 
     try {
-
-        timeout(time: "10", unit: 'MINUTES') {
-            try {
+        try {
+            timeout(time: "10", unit: 'MINUTES') {
                 cleanWS(osName)
                 checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
                 getViewerTool(osName, options)
-            } catch(e) {
-                println("[ERROR] Failed to prepare test group on ${env.NODE_NAME}")
-                println(e.toString())
-                throw e
             }
+        } catch (e) {
+            if (utils.isTimeoutExceeded(e)) {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group (timeout exceeded)", e)
+            } else {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group", e)
+            }            
         }
 
-        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/", 'RprViewer')
+        try {
+            downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/Assets/", 'RprViewer')
+        } catch (Exception e) {
+            throw new ExpectedExceptionWrapper("Failed downloading of Assets", e)
+        }
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"
@@ -192,23 +198,27 @@ def executeTests(String osName, String asicName, Map options)
 
         outputEnvironmentInfo(osName)
 
-        if(options['updateRefs']) {
-            executeTestCommand(osName, asicName, options)
-            executeGenTestRefCommand(osName, options)
-            sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
-        } else {
-            try {
-                println "[INFO] Downloading reference images for ${options.tests}"
-                receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
-                options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+        try {
+            if(options['updateRefs']) {
+                executeTestCommand(osName, asicName, options)
+                executeGenTestRefCommand(osName, options)
+                sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
+            } else {
+                try {
+                    println "[INFO] Downloading reference images for ${options.tests}"
+                    receiveFiles("${REF_PATH_PROFILE}/baseline_manifest.json", './Work/Baseline/')
+                    options.tests.split(" ").each() {
+                        receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+                    }
+                } 
+                catch (e)
+                {
+                    println("Baseline doesn't exist.")
                 }
-            } 
-            catch (e)
-            {
-                println("Baseline doesn't exist.")
+                executeTestCommand(osName, asicName, options)
             }
-            executeTestCommand(osName, asicName, options)
+        } catch (e) {
+            throw new ExpectedExceptionWrapper(e.getMessage()?:"Unknown reason", e)
         }
     } catch (e) {
         if (options.currentTry < options.nodeReallocateTries) {
@@ -230,13 +240,6 @@ def executeTests(String osName, String asicName, Map options)
                     def sessionReport = null
                     sessionReport = readJSON file: 'Results/RprViewer/session_report.json'
 
-                    // if none launched tests - mark build failed
-                    if (sessionReport.summary.total == 0)
-                    {
-                        options.failureMessage = "Noone test was finished for: ${asicName}-${osName}"
-                        currentBuild.result = "FAILED"
-                    }
-
                     if (options.sendToUMS)
                     {
                         universeClient.stage("Tests-${osName}-${asicName}", "end")
@@ -248,7 +251,7 @@ def executeTests(String osName, String asicName, Map options)
                     // reallocate node if there are still attempts
                     if (sessionReport.summary.total == sessionReport.summary.error + sessionReport.summary.skipped) {
                         if (sessionReport.summary.total != sessionReport.summary.skipped){
-                            collectCrashInfo(osName, options)
+                            collectCrashInfo(osName, options, options.currentTry)
                             if (osName == "Ubuntu18"){
                                 sh """
                                     echo "Restarting Unix Machine...."
@@ -257,9 +260,7 @@ def executeTests(String osName, String asicName, Map options)
                                 """
                                 sleep(60)
                             }
-                            if (options.currentTry < options.nodeReallocateTries) {
-                                throw new Exception("All tests crashed")
-                            }
+                            throw new ExpectedExceptionWrapper("All tests crashed", new Exception("All tests crashed"))
                         }
                     }
                 }
@@ -347,23 +348,34 @@ def executeBuild(String osName, Map options)
     }
 
     try {
-        checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
+        try {
+            checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed clonning of RPRViewer repository", "Build", osName)
+            throw e
+        }
+
         outputEnvironmentInfo(osName)
 
-        switch(osName)
-        {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        case 'OSX':
-            println "OSX isn't supported."
-            break;
-        default:
-            executeBuildLinux(options);
+        try {
+            switch(osName)
+            {
+            case 'Windows':
+                executeBuildWindows(options);
+                break;
+            case 'OSX':
+                println "OSX isn't supported."
+                break;
+            default:
+                executeBuildLinux(options);
+            }
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed during RPRViewer building", "Build", osName)
+            throw e
         }
+
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         throw e
     }
     finally {
@@ -376,7 +388,12 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-    checkOutBranchOrScm(options['projectBranch'], options['projectRepo'], true)
+    try {
+        checkOutBranchOrScm(options['projectBranch'], options['projectRepo'], true)
+    } catch (e) {
+        problemMessageManager.saveSpecificFailReason("Failed clonning of RPRViewer repository", "PreBuild")
+        throw e
+    }
 
     options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
     options.commitMessage = bat (script: "git log --format=%%s -n 1", returnStdout: true).split('\r\n')[2].trim().replace('\n', '')
@@ -429,10 +446,16 @@ def executePreBuild(Map options)
 
     dir('jobs_test_rprviewer')
     {
-        checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
+        try {
+            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "PreBuild")
+            throw e
+        }
 
         if(options.testsPackage != "none")
         {
+            // json means custom test suite. Split doesn't supported
             if(options.testsPackage.endsWith('.json'))
             {
                 def testsByJson = readJSON file: "jobs/${options.testsPackage}"
@@ -506,7 +529,12 @@ def executeDeploy(Map options, List platformList, List testResultList)
     {
         if(options['executeTests'] && testResultList)
         {
-            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
+            try {
+                checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_rprviewer.git')
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "Deploy")
+                throw e
+            }
 
             List lostStashes = []
 
@@ -564,9 +592,11 @@ def executeDeploy(Map options, List platformList, List testResultList)
                     }
                 }
             } catch(e) {
+                problemMessageManager.saveSpecificFailReason("Failed report building", "Deploy")
                 println("ERROR during report building")
                 println(e.toString())
                 println(e.getMessage())
+                throw e
             }
 
             try
@@ -599,19 +629,25 @@ def executeDeploy(Map options, List platformList, List testResultList)
             {
                 def summaryReport = readJSON file: 'summaryTestResults/summary_status.json'
                 if (summaryReport.error > 0) {
-                    println("Some tests crashed")
-                    currentBuild.result="FAILED"
+                    println("[INFO] Some tests marked as error. Build result = FAILURE.")
+                    currentBuild.result = "FAILURE"
+
+                    problemMessageManager.saveGlobalFailReason("Some tests marked as error")
                 }
                 else if (summaryReport.failed > 0) {
-                    println("Some tests failed")
-                    currentBuild.result="UNSTABLE"
-                } else {
-                    currentBuild.result="SUCCESS"
+                    println("[INFO] Some tests marked as failed. Build result = UNSTABLE.")
+                    currentBuild.result = "UNSTABLE"
+
+                    problemMessageManager.saveUnstableReason("Some tests marked as failed")
                 }
             }
             catch(e)
             {
+                println(e.toString())
+                println(e.getMessage())
                 println("CAN'T GET TESTS STATUS")
+                problemMessageManager.saveUnstableReason("Can't get tests status")
+                currentBuild.result = "UNSTABLE"
             }
 
             try
@@ -625,8 +661,13 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 options.testsStatus = ""
             }
 
-            utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
-                "Test Report", "Summary Report, Performance Report, Compare Report")
+            try {
+                utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
+                    "Test Report", "Summary Report, Performance Report, Compare Report")
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed report publishing", "Deploy")
+                throw e
+            }
 
             if (options.sendToUMS) {
                 try {
@@ -641,7 +682,9 @@ def executeDeploy(Map options, List platformList, List testResultList)
     }
     catch(e)
     {
-        println(e.toString())
+        println(e.toString());
+        println(e.getMessage());
+        throw e
     }
 }
 
@@ -657,39 +700,70 @@ def call(String projectBranch = "",
          String tester_tag = 'RprViewer') {
 
     def nodeRetry = []
+    Map options = [:]
 
-    String PRJ_ROOT='rpr-core'
-    String PRJ_NAME='RadeonProViewer'
-    String projectRepo='git@github.com:Radeon-Pro/RadeonProViewer.git'
+    try 
+    {
+        try 
+        {
+            String PRJ_ROOT='rpr-core'
+            String PRJ_NAME='RadeonProViewer'
+            String projectRepo='git@github.com:Radeon-Pro/RadeonProViewer.git'
 
-    def universePlatforms = convertPlatforms(platforms);
+            def universePlatforms = convertPlatforms(platforms);
 
-    println "Platforms: ${platforms}"
-    println "Tests: ${tests}"
-    println "Tests package: ${testsPackage}"
-    println "UMS platforms: ${universePlatforms}"
+            println "Platforms: ${platforms}"
+            println "Tests: ${tests}"
+            println "Tests package: ${testsPackage}"
+            println "UMS platforms: ${universePlatforms}"
 
-    multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
-                           [projectBranch:projectBranch,
-                            testsBranch:testsBranch,
-                            updateRefs:updateRefs,
-                            enableNotifications:enableNotifications,
-                            PRJ_NAME:PRJ_NAME,
-                            PRJ_ROOT:PRJ_ROOT,
-                            projectRepo:projectRepo,
-                            BUILDER_TAG:'BuilderViewer',
-                            TESTER_TAG:tester_tag,
-                            executeBuild:true,
-                            executeTests:true,
-                            splitTestsExecution:splitTestsExecution,
-                            DEPLOY_FOLDER:"RprViewer",
-                            testsPackage:testsPackage,
-                            TEST_TIMEOUT:45,
-                            ADDITIONAL_XML_TIMEOUT:15,
-                            REGRESSION_TIMEOUT:45,
-                            DEPLOY_TIMEOUT:45,
-                            tests:tests,
-                            nodeRetry: nodeRetry,
-                            sendToUMS:sendToUMS,
-                            universePlatforms: universePlatforms])
+            options << [projectBranch:projectBranch,
+                        testsBranch:testsBranch,
+                        updateRefs:updateRefs,
+                        enableNotifications:enableNotifications,
+                        PRJ_NAME:PRJ_NAME,
+                        PRJ_ROOT:PRJ_ROOT,
+                        projectRepo:projectRepo,
+                        BUILDER_TAG:'BuilderViewer',
+                        TESTER_TAG:tester_tag,
+                        executeBuild:true,
+                        executeTests:true,
+                        splitTestsExecution:splitTestsExecution,
+                        DEPLOY_FOLDER:"RprViewer",
+                        testsPackage:testsPackage,
+                        TEST_TIMEOUT:45,
+                        ADDITIONAL_XML_TIMEOUT:15,
+                        REGRESSION_TIMEOUT:45,
+                        DEPLOY_TIMEOUT:45,
+                        tests:tests,
+                        nodeRetry: nodeRetry,
+                        sendToUMS:sendToUMS,
+                        universePlatforms: universePlatforms,
+                        problemMessageManager: problemMessageManager
+                        ]
+        } 
+        catch(e)
+        {
+            problemMessageManager.saveSpecificFailReason("Failed initialization", "Init")
+
+            throw e
+        }
+
+        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy, options)
+    }
+    catch(e)
+    {
+        currentBuild.result = "FAILURE"
+        if (sendToUMS){
+            universeClient.changeStatus(currentBuild.result)
+        }
+        println(e.toString());
+        println(e.getMessage());
+
+        throw e
+    }
+    finally
+    {
+        problemMessageManager.publishMessages()
+    }
 }

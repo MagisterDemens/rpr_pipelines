@@ -124,7 +124,6 @@ def executeTests(String osName, String asicName, Map options)
             def sessionReport = readJSON file: 'Results/ai2rpr/session_report.json'
             if (sessionReport.summary.total == 0) {
                 options.failureMessage = "Noone test was finished for: ${asicName}-${osName}"
-                currentBuild.result = "FAILED"
             }
             /*sessionReport.results.each{ testName, testConfigs ->
                 testConfigs.each{ key, value ->
@@ -171,7 +170,6 @@ def executeBuild(String osName, Map options)
         }
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         throw e
     }
     finally {
@@ -297,12 +295,12 @@ def executeDeploy(Map options, List platformList, List testResultList)
             {
                 def summaryReport = readJSON file: 'summaryTestResults/summary_status.json'
                 if (summaryReport.error > 0) {
-                    println("Some tests crashed")
-                    currentBuild.result="FAILED"
+                    println("[INFO] Some tests marked as error. Build result = FAILURE.")
+                    currentBuild.result = "FAILURE"
                 }
                 else if (summaryReport.failed > 0) {
-                    println("Some tests failed")
-                    currentBuild.result="UNSTABLE"
+                    println("[INFO] Some tests marked as failed. Build result = UNSTABLE.")
+                    currentBuild.result = "UNSTABLE"
                 }
             }
             catch(e)
@@ -310,7 +308,7 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 println(e.toString())
                 println(e.getMessage())
                 println("CAN'T GET TESTS STATUS")
-                currentBuild.result="UNSTABLE"
+                currentBuild.result = "UNSTABLE"
             }
 
             try
@@ -328,7 +326,6 @@ def executeDeploy(Map options, List platformList, List testResultList)
         }
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         println(e.toString());
         println(e.getMessage());
         throw e

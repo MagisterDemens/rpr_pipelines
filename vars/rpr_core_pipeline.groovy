@@ -3,6 +3,8 @@ import groovy.transform.Field
 import groovy.json.JsonOutput;
 
 @Field UniverseClient universeClient = new UniverseClient(this, "https://umsapi.cis.luxoft.com", env, "https://imgs.cis.luxoft.com", "AMD%20Radeon™%20ProRender%20Core")
+@Field ProblemMessageManager problemMessageManager = new ProblemMessageManager(this, currentBuild)
+
 
 def getCoreSDK(String osName, Map options)
 {
@@ -179,20 +181,25 @@ def executeTests(String osName, String asicName, Map options)
     Boolean stashResults = true
 
     try {
-
-        timeout(time: "10", unit: 'MINUTES') {
-            try {
+        try {
+            timeout(time: "10", unit: 'MINUTES') {
                 cleanWS(osName)
                 checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_core.git')
                 getCoreSDK(osName, options)
-            } catch(e) {
-                println("[ERROR] Failed to prepare test group on ${env.NODE_NAME}")
-                println(e.toString())
-                throw e
             }
+        } catch (e) {
+            if (utils.isTimeoutExceeded(e)) {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group (timeout exceeded)", e)
+            } else {
+                throw new ExpectedExceptionWrapper("Failed to prepare test group", e)
+            }            
         }
 
-        downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/CoreAssets/", 'CoreAssets')
+        try {
+            downloadAssets("${options.PRJ_ROOT}/${options.PRJ_NAME}/CoreAssets/", 'CoreAssets')
+        } catch (Exception e) {
+            throw new ExpectedExceptionWrapper("Failed downloading of Assets", e)
+        }
 
         String REF_PATH_PROFILE="${options.REF_PATH}/${asicName}-${osName}"
         String JOB_PATH_PROFILE="${options.JOB_PATH}/${asicName}-${osName}"
@@ -201,34 +208,39 @@ def executeTests(String osName, String asicName, Map options)
 
         outputEnvironmentInfo(osName)
 
-        if(options['updateRefs'])
-        {
-            executeTestCommand(osName, asicName, options)
-            executeGenTestRefCommand(osName, options)
-            sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
-        }
-        else if(options.updateRefsByOne)
-        {
-            // Update ref images from one card to others
-            // TODO: Fix hardcode naming
-            executeTestCommand(osName, asicName, options)
-            executeGenTestRefCommand(osName, options)
-            ['AMD_RXVEGA', 'AMD_WX9100', 'AMD_WX7100', 'AMD_RadeonVII', 'NVIDIA_GF1080TI', 'NVIDIA_RTX2080'].each
+        try {
+            if(options['updateRefs'])
             {
-                sendFiles('./Work/Baseline/', "${options.REF_PATH}/${it}-Windows")
+                executeTestCommand(osName, asicName, options)
+                executeGenTestRefCommand(osName, options)
+                sendFiles('./Work/Baseline/', REF_PATH_PROFILE)
             }
-        }
-        else
-        {
-            try {
-                options.tests.split(" ").each() {
-                    receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+            else if(options.updateRefsByOne)
+            {
+                // Update ref images from one card to others
+                // TODO: Fix hardcode naming
+                executeTestCommand(osName, asicName, options)
+                executeGenTestRefCommand(osName, options)
+                ['AMD_RXVEGA', 'AMD_WX9100', 'AMD_WX7100', 'AMD_RadeonVII', 'NVIDIA_GF1080TI', 'NVIDIA_RTX2080'].each
+                {
+                    sendFiles('./Work/Baseline/', "${options.REF_PATH}/${it}-Windows")
                 }
-            } catch(e) {
-                println("No baseline")
             }
-            executeTestCommand(osName, asicName, options)
+            else
+            {
+                try {
+                    options.tests.split(" ").each() {
+                        receiveFiles("${REF_PATH_PROFILE}/${it}", './Work/Baseline/')
+                    }
+                } catch(e) {
+                    println("No baseline")
+                }
+                executeTestCommand(osName, asicName, options)
+            }
+        } catch (e) {
+            throw new ExpectedExceptionWrapper(e.getMessage()?:"Unknown reason", e)
         }
+
     } catch (e) {
         if (options.currentTry < options.nodeReallocateTries) {
             stashResults = false
@@ -249,13 +261,6 @@ def executeTests(String osName, String asicName, Map options)
                     def sessionReport = null
                     sessionReport = readJSON file: 'Results/Core/session_report.json'
 
-                    // if none launched tests - mark build failed
-                    if (sessionReport.summary.total == 0)
-                    {
-                        options.failureMessage = "Noone test was finished for: ${asicName}-${osName}"
-                        currentBuild.result = "FAILED"
-                    }
-
                     if (options.sendToUMS)
                     {
                         universeClient.stage("Tests-${osName}-${asicName}", "end")
@@ -267,7 +272,7 @@ def executeTests(String osName, String asicName, Map options)
                     // reallocate node if there are still attempts
                     if (sessionReport.summary.total == sessionReport.summary.error + sessionReport.summary.skipped) {
                         if (sessionReport.summary.total != sessionReport.summary.skipped){
-                            collectCrashInfo(osName, options)
+                            collectCrashInfo(osName, options, options.currentTry)
                             if (osName == "Ubuntu18"){
                                 sh """
                                     echo "Restarting Unix Machine...."
@@ -276,9 +281,7 @@ def executeTests(String osName, String asicName, Map options)
                                 """
                                 sleep(60)
                             }
-                            if (options.currentTry < options.nodeReallocateTries) {
-                                throw new Exception("All tests crashed")
-                            }
+                            throw new ExpectedExceptionWrapper("All tests crashed", new Exception("All tests crashed"))
                         }
                     }
                 }
@@ -328,25 +331,34 @@ def executeBuild(String osName, Map options)
     try {
         dir('RadeonProRenderSDK')
         {
-            checkOutBranchOrScm(options['projectBranch'], 'git@github.com:GPUOpen-LibrariesAndSDKs/RadeonProRenderSDK.git')
+            try {
+                checkOutBranchOrScm(options['projectBranch'], 'git@github.com:GPUOpen-LibrariesAndSDKs/RadeonProRenderSDK.git')
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of Core repository", "Build", osName)
+                throw e
+            }
         }
 
         outputEnvironmentInfo(osName)
 
-        switch(osName)
-        {
-        case 'Windows':
-            executeBuildWindows(options);
-            break;
-        case 'OSX':
-            executeBuildOSX(options);
-            break;
-        default:
-            executeBuildLinux(options);
+        try {
+            switch(osName)
+            {
+            case 'Windows':
+                executeBuildWindows(options);
+                break;
+            case 'OSX':
+                executeBuildOSX(options);
+                break;
+            default:
+                executeBuildLinux(options);
+            }
+        } catch (e) {
+            problemMessageManager.saveSpecificFailReason("Failed during Core building", "Build", osName)
+            throw e
         }
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         throw e
     }
     finally {
@@ -359,8 +371,12 @@ def executeBuild(String osName, Map options)
 
 def executePreBuild(Map options)
 {
-
-    checkOutBranchOrScm(options['projectBranch'], 'git@github.com:GPUOpen-LibrariesAndSDKs/RadeonProRenderSDK.git')
+    try {
+        checkOutBranchOrScm(options['projectBranch'], 'git@github.com:GPUOpen-LibrariesAndSDKs/RadeonProRenderSDK.git')
+    } catch (e) {
+        problemMessageManager.saveSpecificFailReason("Failed clonning of Core repository", "PreBuild")
+        throw e
+    }
 
     options.commitAuthor = bat (script: "git show -s --format=%%an HEAD ",returnStdout: true).split('\r\n')[2].trim()
     options.commitMessage = bat (script: "git log --format=%%s -n 1", returnStdout: true).split('\r\n')[2].trim().replace('\n', '')
@@ -406,7 +422,12 @@ def executePreBuild(Map options)
     {
         dir('jobs_test_core')
         {
-            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_core.git')
+            try {
+                checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_core.git')
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "PreBuild")
+                throw e
+            }
             // json means custom test suite. Split doesn't supported
             String tempTests = readFile("jobs/${options.testsPackage}")
             tempTests.split("\n").each {
@@ -457,7 +478,11 @@ def executeDeploy(Map options, List platformList, List testResultList)
     try {
         if(options['executeTests'] && testResultList)
         {
-            checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_core.git')
+            try {
+                checkOutBranchOrScm(options['testsBranch'], 'git@github.com:luxteam/jobs_test_core.git')
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed clonning of tests repository", "Deploy")
+            }
 
             List lostStashes = []
 
@@ -501,26 +526,34 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 println("[ERROR] Can't generate number of lost tests")
             }
 
-            dir("jobs_launcher")
-            {
-                if(options.projectBranch != "") {
-                    options.branchName = options.projectBranch
-                } else {
-                    options.branchName = env.BRANCH_NAME
-                }
-                if(options.incrementVersion) {
-                    options.branchName = "master"
-                }
+            try {
+                dir("jobs_launcher")
+                {
+                    if(options.projectBranch != "") {
+                        options.branchName = options.projectBranch
+                    } else {
+                        options.branchName = env.BRANCH_NAME
+                    }
+                    if(options.incrementVersion) {
+                        options.branchName = "master"
+                    }
 
-                options.commitMessage = options.commitMessage.replace("'", "")
-                options.commitMessage = options.commitMessage.replace('"', '')
+                    options.commitMessage = options.commitMessage.replace("'", "")
+                    options.commitMessage = options.commitMessage.replace('"', '')
 
-                def retryInfo = JsonOutput.toJson(options.nodeRetry)
-                bat """
-                build_reports.bat ..\\summaryTestResults Core ${options.commitSHA} ${options.branchName} \"${escapeCharsByUnicode(options.commitMessage)}\" \"${escapeCharsByUnicode(retryInfo.toString())}\"
-                """
+                    def retryInfo = JsonOutput.toJson(options.nodeRetry)
+                    bat """
+                    build_reports.bat ..\\summaryTestResults Core ${options.commitSHA} ${options.branchName} \"${escapeCharsByUnicode(options.commitMessage)}\" \"${escapeCharsByUnicode(retryInfo.toString())}\"
+                    """
 
-                bat "get_status.bat ..\\summaryTestResults"
+                    bat "get_status.bat ..\\summaryTestResults"
+                }    
+            } catch(e) {
+                problemMessageManager.saveSpecificFailReason("Failed report building", "Deploy")
+                println("[ERROR] Failed to build report.")
+                println(e.toString())
+                println(e.getMessage())
+                throw e
             }
 
             try
@@ -540,17 +573,25 @@ def executeDeploy(Map options, List platformList, List testResultList)
             {
                 def summaryReport = readJSON file: 'summaryTestResults/summary_status.json'
                 if (summaryReport.error > 0) {
-                    println("Some tests crashed")
-                    currentBuild.result="FAILED"
+                    println("[INFO] Some tests marked as error. Build result = FAILURE.")
+                    currentBuild.result = "FAILURE"
+
+                    problemMessageManager.saveGlobalFailReason("Some tests marked as error")
                 }
-                if (summaryReport.failed > 0) {
-                    println("Some tests failed")
-                    currentBuild.result="UNSTABLE"
+                else if (summaryReport.failed > 0) {
+                    println("[INFO] Some tests marked as failed. Build result = UNSTABLE.")
+                    currentBuild.result = "UNSTABLE"
+
+                    problemMessageManager.saveUnstableReason("Some tests marked as failed")
                 }
             }
             catch(e)
             {
+                println(e.toString())
+                println(e.getMessage())
                 println("CAN'T GET TESTS STATUS")
+                problemMessageManager.saveUnstableReason("Can't get tests status")
+                currentBuild.result = "UNSTABLE"
             }
 
             try
@@ -564,8 +605,12 @@ def executeDeploy(Map options, List platformList, List testResultList)
                 options.testsStatus = ""
             }
 
-            utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
-                "Test Report", "Summary Report, Performance Report, Compare Report")
+            try {
+                utils.publishReport(this, "${BUILD_URL}", "summaryTestResults", "summary_report.html, performance_report.html, compare_report.html", \
+                    "Test Report", "Summary Report, Performance Report, Compare Report")
+            } catch (e) {
+                problemMessageManager.saveSpecificFailReason("Failed report publishing", "Deploy")
+            }
 
             if (options.sendToUMS) {
                 try {
@@ -579,7 +624,6 @@ def executeDeploy(Map options, List platformList, List testResultList)
         }
     }
     catch (e) {
-        currentBuild.result = "FAILED"
         println(e.toString());
         println(e.getMessage());
         throw e
@@ -603,68 +647,85 @@ def call(String projectBranch = "",
          String iterations = "0",
          Boolean sendToUMS = true,
          String tester_tag = 'Core') {
-    try
+    
+    def nodeRetry = []
+    Map options = [:]
+
+    try 
     {
-        String PRJ_NAME="RadeonProRenderCore"
-        String PRJ_ROOT="rpr-core"
+        try 
+        {
+            String PRJ_NAME="RadeonProRenderCore"
+            String PRJ_ROOT="rpr-core"
 
-        def nodeRetry = []
-
-        gpusCount = 0
-        platforms.split(';').each()
-        { platform ->
-            List tokens = platform.tokenize(':')
-            if (tokens.size() > 1)
-            {
-                gpuNames = tokens.get(1)
-                gpuNames.split(',').each()
+            gpusCount = 0
+            platforms.split(';').each()
+            { platform ->
+                List tokens = platform.tokenize(':')
+                if (tokens.size() > 1)
                 {
-                    gpusCount += 1
+                    gpuNames = tokens.get(1)
+                    gpuNames.split(',').each()
+                    {
+                        gpusCount += 1
+                    }
                 }
             }
+
+            def universePlatforms = convertPlatforms(platforms);
+
+            println "Platforms: ${platforms}"
+            println "Tests: ${tests}"
+            println "Tests package: ${testsPackage}"
+            println "UMS platforms: ${universePlatforms}"
+
+            options << [projectBranch:projectBranch,
+                        testsBranch:testsBranch,
+                        updateRefs:updateRefs,
+                        updateRefsByOne:updateRefsByOne,
+                        enableNotifications:enableNotifications,
+                        PRJ_NAME:PRJ_NAME,
+                        PRJ_ROOT:PRJ_ROOT,
+                        BUILDER_TAG:'BuilderS',
+                        TESTER_TAG:tester_tag,
+                        slackChannel:"${SLACK_CORE_CHANNEL}",
+                        renderDevice:renderDevice,
+                        testsPackage:testsPackage,
+                        tests:tests.replace(',', ' '),
+                        executeBuild:true,
+                        executeTests:true,
+                        reportName:'Test_20Report',
+                        TEST_TIMEOUT:110,
+                        width:width,
+                        gpusCount:gpusCount,
+                        height:height,
+                        iterations:iterations,
+                        sendToUMS:sendToUMS,
+                        universePlatforms: universePlatforms,
+                        nodeRetry: nodeRetry
+                        ]
+        }
+        catch(e)
+        {
+            problemMessageManager.saveSpecificFailReason("Failed initialization", "Init")
+
+            throw e
         }
 
-        def universePlatforms = convertPlatforms(platforms);
-
-        println "Platforms: ${platforms}"
-        println "Tests: ${tests}"
-        println "Tests package: ${testsPackage}"
-        println "UMS platforms: ${universePlatforms}"
-
-        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
-                               [projectBranch:projectBranch,
-                                testsBranch:testsBranch,
-                                updateRefs:updateRefs,
-                                updateRefsByOne:updateRefsByOne,
-                                enableNotifications:enableNotifications,
-                                PRJ_NAME:PRJ_NAME,
-                                PRJ_ROOT:PRJ_ROOT,
-                                BUILDER_TAG:'BuilderS',
-                                TESTER_TAG:tester_tag,
-                                slackChannel:"${SLACK_CORE_CHANNEL}",
-                                renderDevice:renderDevice,
-                                testsPackage:testsPackage,
-                                tests:tests.replace(',', ' '),
-                                executeBuild:true,
-                                executeTests:true,
-                                reportName:'Test_20Report',
-                                TEST_TIMEOUT:110,
-                                width:width,
-                                gpusCount:gpusCount,
-                                height:height,
-                                iterations:iterations,
-                                sendToUMS:sendToUMS,
-                                universePlatforms: universePlatforms,
-                                nodeRetry: nodeRetry
-                                ])
+        multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy, options)
     }
-    catch(e) {
-        currentBuild.result = "FAILED"
+    catch(e) 
+    {
+        currentBuild.result = "FAILURE"
         if (sendToUMS){
             universeClient.changeStatus(currentBuild.result)
         }
         println(e.toString());
         println(e.getMessage());
         throw e
+    }
+    finally
+    {
+        problemMessageManager.publishMessages()
     }
 }
