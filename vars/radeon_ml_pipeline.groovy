@@ -129,8 +129,8 @@ def executeTests(String osName, String asicName, Map options)
 def executeBuildWindows(Map options)
 {
     bat """
-        xcopy ..\\RML_MIOpen third_party\\miopen /s/y/i
-        xcopy ..\\RML_tensorflow_cc third_party\\tensorflow_cc /s/y/i
+    xcopy ..\\\\RML_thirdparty\\\\MIOpen third_party\\\\miopen /s/y/i
+    xcopy ..\\\\RML_thirdparty\\\\tensorflow third_party\\\\tensorflow /s/y/i
     """
 
     cmakeKeysWin ='-G "Visual Studio 15 2017 Win64" -DRML_DIRECTML=ON -DRML_MIOPEN=ON -DRML_TENSORFLOW_CPU=ON -DRML_TENSORFLOW_CUDA=OFF -DRML_MPS=OFF'
@@ -138,7 +138,7 @@ def executeBuildWindows(Map options)
     bat """
         mkdir build
         cd build
-        cmake ${cmakeKeysWin} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow_cc -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ..\\${STAGE_NAME}.log 2>&1
+        cmake ${cmakeKeysWin} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ..\\${STAGE_NAME}.log 2>&1
         set msbuild=\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\MSBuild\\15.0\\Bin\\MSBuild.exe\"
         %msbuild% RadeonML.sln -property:Configuration=Release >> ..\\${STAGE_NAME}.log 2>&1
     """
@@ -146,7 +146,7 @@ def executeBuildWindows(Map options)
     bat """
         cd build
         xcopy ..\\third_party\\miopen\\MIOpen.dll .\\Release\\MIOpen.dll*
-        xcopy ..\\third_party\\tensorflow_cc\\windows\\* .\\Release
+        xcopy ..\\third_party\\tensorflow\\windows\\* .\\Release
         mkdir .\\Release\\rml
         mkdir .\\Release\\rml\\rml
         mkdir .\\Release\\rml\\rml_internal
@@ -158,7 +158,12 @@ def executeBuildWindows(Map options)
 
 def executeBuildOSX(Map options)
 {
-    cmakeKeysOSX = '-DRML_DIRECTML=OFF -DRML_MIOPEN=OFF -DRML_TENSORFLOW_CPU=OFF -DRML_TENSORFLOW_CUDA=OFF -DRML_MPS=ON'
+    sh """
+        cp -r ../RML_thirdparty/MIOpen/* ./third_party/miopen
+        cp -r ../RML_thirdparty/tensorflow/* ./third_party/tensorflow
+    """
+
+    cmakeKeysOSX = "-DRML_DIRECTML=OFF -DRML_MIOPEN=OFF -DRML_TENSORFLOW_CPU=ON -DRML_TENSORFLOW_CUDA=OFF -DRML_MPS=ON -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen"
     sh """
         mkdir build
         cd build
@@ -185,18 +190,18 @@ def executeBuildOSX(Map options)
 def executeBuildLinux(Map options)
 {
     sh """
-        cp -r ../RML_MIOpen/* ./third_party/miopen
-        cp -r ../RML_tensorflow_cc/ ./third_party/tensorflow_cc
+        cp -r ../RML_thirdparty/MIOpen/* ./third_party/miopen
+        cp -r ../RML_thirdparty/tensorflow/* ./third_party/tensorflow
     """
     cmakeKeysLinux = [
-            'Ubuntu18': '-DRML_DIRECTML=OFF -DRML_MIOPEN=ON -DRML_TENSORFLOW_CPU=ON -DRML_TENSORFLOW_CUDA=ON -DRML_MPS=OFF',
-            'CentOS7_6': '-DRML_DIRECTML=OFF -DRML_MIOPEN=ON -DRML_TENSORFLOW_CPU=OFF -DRML_TENSORFLOW_CUDA=OFF -DRML_MPS=OFF'
+        'Ubuntu18': '-DRML_DIRECTML=OFF -DRML_MIOPEN=ON -DRML_TENSORFLOW_CPU=ON -DRML_TENSORFLOW_CUDA=ON -DRML_MPS=OFF',
+        'CentOS7_6': '-DRML_DIRECTML=OFF -DRML_MIOPEN=ON -DRML_TENSORFLOW_CPU=ON -DRML_TENSORFLOW_CUDA=OFF -DRML_MPS=OFF'
     ]
 
     sh """
         mkdir build
         cd build
-        cmake ${cmakeKeysLinux[CIS_OS]} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow_cc -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ../${STAGE_NAME}.log 2>&1
+        cmake ${cmakeKeysLinux[CIS_OS]} -DRML_TENSORFLOW_DIR=${WORKSPACE}/third_party/tensorflow -DMIOpen_INCLUDE_DIR=${WORKSPACE}/third_party/miopen -DMIOpen_LIBRARY_DIR=${WORKSPACE}/third_party/miopen .. >> ../${STAGE_NAME}.log 2>&1
         make -j 4 >> ../${STAGE_NAME}.log 2>&1
     """
 
@@ -204,7 +209,7 @@ def executeBuildLinux(Map options)
         cd build
         mv bin Release
         cp ../third_party/miopen/libMIOpen.so* ./Release
-        cp ../third_party/tensorflow_cc/linux/* ./Release
+        cp ../third_party/tensorflow/linux/* ./Release
 
         mkdir ./Release/rml
         mkdir ./Release/rml/rml
@@ -270,8 +275,8 @@ def executeBuild(String osName, Map options)
     {
         checkOutBranchOrScm(options['projectBranch'], options['projectRepo'])
 
-        receiveFiles("rpr-ml/MIOpen/*", "../RML_MIOpen")
-        receiveFiles("rpr-ml/tensorflow_cc/*", "../RML_tensorflow_cc")
+        receiveFiles("rpr-ml/MIOpen/*", "../RML_thirdparty/MIOpen")
+        receiveFiles("rpr-ml/tensorflow/*", "../RML_thirdparty/tensorflow")
 
         outputEnvironmentInfo(osName)
 
@@ -331,7 +336,7 @@ def call(String projectBranch = "",
          Boolean executeFT = true)
 {
     String PRJ_ROOT='rpr-ml'
-    String PRJ_NAME='RadeonML_com'
+    String PRJ_NAME='RadeonML'
 
     multiplatform_pipeline(platforms, this.&executePreBuild, this.&executeBuild, this.&executeTests, this.&executeDeploy,
             [platforms:platforms,

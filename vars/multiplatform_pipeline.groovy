@@ -28,7 +28,7 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                         Map newOptions = options.clone()
                         newOptions['testResultsName'] = testName ? "testResult-${asicName}-${osName}-${testName}" : "testResult-${asicName}-${osName}"
                         newOptions['stageName'] = testName ? "${asicName}-${osName}-${testName}" : "${asicName}-${osName}"
-                        newOptions['tests'] = testName ? testName : options.tests
+                        newOptions['tests'] = testName ?: options.tests
 
                         def testerTag = "Tester"
                         if (options.TESTER_TAG){
@@ -37,28 +37,78 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                             }else {
                                 testerTag = "${options.TESTER_TAG} && Tester"
                             }
-                        }
+                        } 
                         def testerLabels = "${osName} && ${testerTag} && OpenCL && gpu${asicName}"
 
-                        def retringFunction = { nodesList ->
+                        def retringFunction = { nodesList, currentTry ->
                             try {
                                 executeTests(osName, asicName, newOptions)
                             } catch(Exception e) {
+                                // save expected exception message for add it in report
+                                String expectedExceptionMessage = ""
+                                if (e instanceof ExpectedExceptionWrapper) {
+                                    expectedExceptionMessage = e.getMessage()
+                                    e = e.getCause()
+                                }
+
+                                println "[ERROR] Failed during tests on ${env.NODE_NAME} node"
+                                println "Exception: ${e.toString()}"
+                                println "Exception message: ${e.getMessage()}"
+                                println "Exception cause: ${e.getCause()}"
+                                println "Exception stack trace: ${e.getStackTrace()}"
+
+                                String exceptionClassName = e.getClass().toString()
+                                if (exceptionClassName.contains("FlowInterruptedException")) {
+                                    e.getCauses().each(){
+                                        // UserInterruption aborting by user
+                                        // ExceededTimeout aborting by timeout
+                                        // CancelledCause for aborting by new commit
+                                        String causeClassName = it.getClass().toString()
+                                        println "Interruption cause: ${causeClassName}"
+                                        if (causeClassName.contains("CancelledCause")) {
+                                            expectedExceptionMessage = "Build was aborted by new commit"
+                                        } else if (causeClassName.contains("UserInterruption")) {
+                                            expectedExceptionMessage = "Build was aborted by user"
+                                        } else if ((causeClassName.contains("TimeoutStepExecution") || causeClassName.contains("ExceededTimeout")) && (!expectedExceptionMessage || expectedExceptionMessage == 'Unknown reason')) {
+                                            expectedExceptionMessage = "Timeout exceeded (pipelines layer)"
+                                        }
+                                    }
+                                } else if (exceptionClassName.contains("ClosedChannelException") || exceptionClassName.contains("RemotingSystemException") || exceptionClassName.contains("InterruptedException")) {
+                                    expectedExceptionMessage = "Lost connection with machine"
+                                }
+
                                 // add info about retry to options
                                 boolean added = false;
                                 String testsOrTestPackage = newOptions['tests'];
                                 if (testsOrTestPackage == ''){
                                     testsOrTestPackage = newOptions['testsPackage'].replace(' ', '_')
                                 }
+
+                                if (!expectedExceptionMessage) {
+                                    expectedExceptionMessage = "Unexpected exception"
+                                }
+
                                 if (options.containsKey('nodeRetry')) {
-                                    options['nodeRetry'].each{ retry ->
-                                        if (retry['Testers'].equals(nodesList)){
-                                            retry['Tries'][testsOrTestPackage].add([host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))])
+                                    Map tryInfo = [host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.retry_${currentTry}.crash.log", exception: expectedExceptionMessage, time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))]
+
+                                    retryLoops: for (testers in options['nodeRetry']) {
+                                        if (testers['Testers'].equals(nodesList)){
+                                            for (group in testers['Tries']) {
+                                                if (group[testsOrTestPackage]) {
+                                                    group[testsOrTestPackage].add(tryInfo)
+                                                    added = true
+                                                    break retryLoops
+                                                }
+                                            }
+                                            // add list for test group if it doesn't exists
+                                            testers['Tries'].add([(testsOrTestPackage): [tryInfo]])
                                             added = true
+                                            break retryLoops
                                         }
                                     }
+
                                     if (!added){
-                                        options['nodeRetry'].add([Testers: nodesList, Tries: [["${testsOrTestPackage}": [[host:env.NODE_NAME, link:"${testsOrTestPackage}.${env.NODE_NAME}.crash.log", time: LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))]]]]])
+                                        options['nodeRetry'].add([Testers: nodesList, gpuName: asicName, osName: osName, Tries: [[(testsOrTestPackage): [tryInfo]]]])
                                     }
                                     println options['nodeRetry'].inspect()
                                 }
@@ -66,8 +116,14 @@ def executeTestsNode(String osName, String gpuNames, def executeTests, Map optio
                                 throw e
                             }
                         }
-                        Integer retries_count = options.retriesForTestStage ?: -1
-                        run_with_retries(testerLabels, options.TEST_TIMEOUT, retringFunction, true, "Test", newOptions, [], retries_count)
+
+                        try {
+                            Integer retries_count = options.retriesForTestStage ?: -1
+                            run_with_retries(testerLabels, options.TEST_TIMEOUT, retringFunction, true, "Test", newOptions, [], retries_count, osName)
+                        } catch (e) {
+                            println "Exception: ${e.toString()}"
+                            println "Exception message: ${e.getMessage()}"
+                        }
                     }
                 }
             }
@@ -92,13 +148,15 @@ def executePlatform(String osName, String gpuNames, def executeBuild, def execut
                 {
                     def builderLabels = "${osName} && ${options.BUILDER_TAG}"
 
-                    def retringFunction = { nodesList ->
+                    def retringFunction = { nodesList, currentTry ->
                         executeBuild(osName, options)
                     }
 
-                    run_with_retries(builderLabels, options.BUILD_TIMEOUT, retringFunction, false, "Build", options, ['FlowInterruptedException'])
+                    run_with_retries(builderLabels, options.BUILD_TIMEOUT, retringFunction, false, "Build", options, ['FlowInterruptedException'], -1, osName, true)
                 }
             }
+
+
             if (options.containsKey('tests') && options.containsKey('testsPackage')){
                 if (options['testsPackage'] != 'none' || options['tests'].size() == 0 || !(options['tests'].size() == 1 && options['tests'].get(0).length() == 0)){ // BUG: can throw exception if options['tests'] is string with length 1
                     executeTestsNode(osName, gpuNames, executeTests, options)
@@ -125,6 +183,34 @@ def executePlatform(String osName, String gpuNames, def executeBuild, def execut
 
 def call(String platforms, def executePreBuild, def executeBuild, def executeTests, def executeDeploy, Map options) {
     try {
+        try {
+            if (env.BuildPriority) {
+                currentBuild.displayName = "${currentBuild.displayName} (Priority: ${env.BuildPriority})"
+                println("[INFO] Priority was set by BuildPriority parameter")
+            } else {
+                def jenkins = Jenkins.getInstance();        
+                def views = Jenkins.getInstance().getViews()
+
+                def jobsViews = []
+                for (view in views) {
+                    if (view.contains(jenkins.getItem(currentBuild.getProjectName()))) {
+                        jobsViews.add(view.getDisplayName())
+                    }
+                }
+
+                if (jobsViews.contains('Autojobs')) {
+                    currentBuild.displayName = "${currentBuild.displayName} (Priority: 20)"
+                } else if (jobsViews.contains('Large_autojobs')) {
+                    currentBuild.displayName = "${currentBuild.displayName} (Priority: 30)"
+                } else {
+                    currentBuild.displayName = "${currentBuild.displayName} (Priority: 40)"
+                }
+                println("[INFO] Priority was set based on view of job")
+            }
+        } catch (e) {
+            println("[ERROR Can't add priority in build name")
+            println(e.toString())
+        }
 
         // if it's PR - supersede all previously launched executions
         if(env.CHANGE_ID) {
@@ -196,6 +282,22 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                                     println("[ERROR] Failed during prebuild stage on ${env.NODE_NAME}")
                                     println(e.toString());
                                     println(e.getMessage());
+
+                                    String exceptionClassName = e.getClass().toString()
+                                    if (exceptionClassName.contains("FlowInterruptedException")) {
+                                        e.getCauses().each(){
+                                            String causeClassName = it.getClass().toString()
+                                            if (causeClassName.contains("ExceededTimeout")) {
+                                                if (options.problemMessageManager) {
+                                                    options.problemMessageManager.saveSpecificFailReason("Timeout exceeded", "PreBuild")
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (options.problemMessageManager) {
+                                        options.problemMessageManager.saveGeneralFailReason("Unknown reason", "PreBuild")
+                                    }
+
                                     throw e
                                 }
                             }
@@ -272,7 +374,7 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
                     {
                         def reportBuilderLabels = "Windows && ReportBuilder"
 
-                        def retringFunction = { nodesList ->
+                        def retringFunction = { nodesList, currentTry ->
                             executeDeploy(options, platformList, testResultList)
                         }
 
@@ -290,8 +392,6 @@ def call(String platforms, def executePreBuild, def executeBuild, def executeTes
     }
     catch (e)
     {
-        println(e.toString());
-        println(e.getMessage());
         currentBuild.result = "FAILURE"
         throw e
     }
