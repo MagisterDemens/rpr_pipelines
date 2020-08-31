@@ -9,50 +9,41 @@ def executeBuildWindows(Map options)
         // vcvars64.bat sets VS/msbuild env
         bat """
             call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat" >> ${STAGE_NAME}.EnvVariables.log 2>&1
-        """
+        
 
-        // VulkanWrappers
-        dir("RPRViewer\\deps\\VidWrappers") {
-            bat """
-                cmake -G "Visual Studio 15 2017 Win64" -B build -DVW_ENABLE_RRNEXT=OFF >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
-                cmake --build build --target VidWrappers --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
-                cmake --build build --target SPVRemapper --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
-            """
-        }
+            :: VulkanWrappers
 
-        dir("USDPixar") {
-            bat """
-                git apply ../usd_dev.patch  >> ..\\${STAGE_NAME}.USDPixar.log 2>&1
-            """
-        }
+            cd RPRViewer\\deps\\VidWrappers
+            cmake -G "Visual Studio 15 2017 Win64" -B build -DVW_ENABLE_RRNEXT=OFF >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
+            cmake --build build --target VidWrappers --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
+            cmake --build build --target SPVRemapper --config Release >> ..\\..\\..\\${STAGE_NAME}.VulkanWrappers.log 2>&1
+            cd ..\\..\\..
 
-        // PySide
-        dir("RPRViewer\\deps\\PySide") {
-            bat """
-                python setup.py install --ignore-git --parallel=%NUMBER_OF_PROCESSORS% >> ..\\..\\..\\${STAGE_NAME}.USDPixar.log 2>&1
-            """
-        }
+            git apply usd_dev.patch  >> ${STAGE_NAME}.USDPixar.log 2>&1
 
-        // USD
-        bat """
-            python USDPixar/build_scripts/build_usd.py --build RPRViewer/build --src RPRViewer/deps RPRViewer/inst >> ${STAGE_NAME}.USDPixar.log 2>&1
+            :: PySide
+
+            python RPRViewer\\deps\\PySide\\setup.py install --ignore-git --parallel=%NUMBER_OF_PROCESSORS% >> ${STAGE_NAME}.USDPixar.log 2>&1
+
+            :: USD
+
+            python USDPixar\\build_scripts\\build_usd.py --build RPRViewer/build --src RPRViewer/deps RPRViewer/inst >> ${STAGE_NAME}.USDPixar.log 2>&1
+        
+            :: HdRPRPlugin
+
+            cd HdRPRPlugin
+
+            set PXR_DIR=%CD%\\USDPixar
+            set INSTALL_PREFIX_DIR=%CD%\\RPRViewer\\inst
+
+            cmake -B build -G "Visual Studio 15 2017 Win64" -Dpxr_DIR=%PXR_DIR% -DCMAKE_INSTALL_PREFIX=%INSTALL_PREFIX_DIR% ^
+                -DRPR_BUILD_AS_HOUDINI_PLUGIN=FALSE -DPXR_USE_PYTHON_3=ON >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
+            cmake --build build --config Release --target install >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
         """
 
         // for testing
         //set PATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\bin;${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib;%PATH%
         //set PYTHONPATH=${WORKSPACE}\\RPRViewer\\RPRViewer\\inst\\lib\\python;%PYTHONPATH%
-
-        // HdRprPlugin
-        dir("HdRPRPlugin") {
-            bat """
-                set PXR_DIR=%CD%\\USDPixar
-                set INSTALL_PREFIX_DIR=%CD%\\RPRViewer\\inst
-
-                cmake -B build -G "Visual Studio 15 2017 Win64" -Dpxr_DIR=%PXR_DIR% -DCMAKE_INSTALL_PREFIX=%INSTALL_PREFIX_DIR% ^
-                    -DRPR_BUILD_AS_HOUDINI_PLUGIN=FALSE -DPXR_USE_PYTHON_3=ON >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
-                cmake --build build --config Release --target install >> ..\\${STAGE_NAME}.HdRPRPlugin.log 2>&1
-            """
-        }
         
         // TODO: filter files for archive
         zip archive: true, dir: "RPRViewer/inst", glob: '', zipFile: "RadeonProUSDViewer_Windows.zip"
